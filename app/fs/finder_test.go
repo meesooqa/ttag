@@ -3,16 +3,19 @@ package fs
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zaptest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestFindFiles_File(t *testing.T) {
-	logger := zaptest.NewLogger(t)
+	logger := zap.NewExample()
 	finder := NewFinder(logger)
 
 	tmpFile, err := os.CreateTemp("", "testfile_*.txt")
@@ -35,7 +38,7 @@ func TestFindFiles_File(t *testing.T) {
 }
 
 func TestFindFiles_Directory(t *testing.T) {
-	logger := zaptest.NewLogger(t)
+	logger := zap.NewExample()
 	finder := NewFinder(logger)
 
 	tempDir, err := os.MkdirTemp("", "testdir")
@@ -72,11 +75,10 @@ func TestFindFiles_Directory(t *testing.T) {
 }
 
 func TestFindFiles_NonExistent(t *testing.T) {
-	logger := zaptest.NewLogger(t)
+	logger := zap.NewExample()
 	finder := NewFinder(logger)
 
 	nonExistentPath := "/nonexistentpath_123456789"
-
 	filesChan := make(chan string)
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -89,4 +91,80 @@ func TestFindFiles_NonExistent(t *testing.T) {
 	wg.Wait()
 
 	assert.Empty(t, files)
+}
+
+func TestFindFiles_NonExistent_Logs(t *testing.T) {
+	core, observedLogs := observer.New(zap.ErrorLevel)
+	logger := zap.New(core)
+	finder := NewFinder(logger)
+
+	nonExistentPath := "/nonexistentpath_123456789"
+	filesChan := make(chan string)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go finder.FindFiles(nonExistentPath, filesChan, &wg)
+
+	// Считываем канал (он должен быть закрыт)
+	for range filesChan {
+	}
+	wg.Wait()
+
+	var found bool
+	for _, entry := range observedLogs.All() {
+		if entry.Message == "Can't stat file" {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Ожидаемое сообщение об ошибке 'Can't stat file' не найдено")
+}
+
+func TestFindFiles_DirectoryWithInaccessibleSubDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Пропускаем тест для недоступной поддиректории на Windows")
+	}
+
+	core, observedLogs := observer.New(zap.ErrorLevel)
+	logger := zap.New(core)
+	finder := NewFinder(logger)
+
+	tempDir, err := os.MkdirTemp("", "testdir")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	accessibleFile := filepath.Join(tempDir, "file1.txt")
+	err = os.WriteFile(accessibleFile, []byte("content"), 0644)
+	require.NoError(t, err)
+
+	inaccessibleDir := filepath.Join(tempDir, "inaccessible")
+	err = os.Mkdir(inaccessibleDir, 0755)
+	require.NoError(t, err)
+	// Убираем все права доступа, чтобы симулировать ошибку чтения
+	err = os.Chmod(inaccessibleDir, 0000)
+	require.NoError(t, err)
+
+	filesChan := make(chan string)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go finder.FindFiles(tempDir, filesChan, &wg)
+
+	var files []string
+	for file := range filesChan {
+		files = append(files, file)
+	}
+	wg.Wait()
+
+	assert.Contains(t, files, accessibleFile)
+
+	var found bool
+	for _, entry := range observedLogs.All() {
+		if strings.Contains(entry.Message, "Error while walking") {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "Ожидаемое сообщение об ошибке при обходе недоступной директории не найдено")
+
+	err = os.Chmod(inaccessibleDir, 0755)
+	require.NoError(t, err)
 }
