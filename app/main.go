@@ -3,12 +3,12 @@ package main
 import (
 	"os"
 	"sync"
-	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/meesooqa/ttag/app/fs"
+	"github.com/meesooqa/ttag/app/proc"
 )
 
 var logger *zap.Logger
@@ -28,24 +28,11 @@ func main() {
 	go finder.FindFiles(path, filesChan, &wg)
 
 	wg.Add(1)
-	go processFile(filesChan, &wg)
+	processor := proc.NewProcessor(logger)
+	go processor.ProcessFile(filesChan, &wg)
 
 	wg.Wait()
 	logger.Info("All goroutines are done")
-}
-
-func processFile(filesChan <-chan string, wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	for filePath := range filesChan {
-		logger.Info("Got file:", zap.String("filePath", filePath))
-		Worker(filePath)
-	}
-}
-
-func Worker(filename string) {
-	// process File Worker
-	time.Sleep(1 * time.Second)
 }
 
 func initLogger() {

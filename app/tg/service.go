@@ -1,0 +1,33 @@
+package tg
+
+import (
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.uber.org/zap"
+)
+
+type ArchivedMessage struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+	MessageID string             `bson:"message_id" json:"MessageID"`
+	Datetime  string             `bson:"datetime" json:"Datetime"`
+	Tags      []string           `bson:"tags" json:"Tags"`
+}
+
+type Service interface {
+	ParseArchivedFile(filename string, messagesChan chan<- ArchivedMessage)
+}
+
+type TgService struct {
+	log    *zap.Logger
+	parser Parser
+}
+
+func NewService(log *zap.Logger) *TgService {
+	return &TgService{
+		log:    log,
+		parser: NewTgArchivedHTMLParser(log),
+	}
+}
+
+func (s *TgService) ParseArchivedFile(filename string, messagesChan chan<- ArchivedMessage) {
+	s.parser.ParseFile(filename, messagesChan)
+}
