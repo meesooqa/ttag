@@ -25,6 +25,7 @@ func NewMongoDB(log *zap.Logger) *MongoDB {
 }
 
 func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
+	// TODO UpsertMany
 	db.log.Debug("UpsertMany")
 
 	// Подключаемся к MongoDB
@@ -38,8 +39,8 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 		}
 	}()
 
-	collection := client.Database("test").Collection("logs")
-	saver := NewSaver(collection, 10, 5*time.Second, 50)
+	collection := client.Database("db_tags").Collection("tags")
+	saver := NewSaver(collection, 10, 2*time.Second, 50)
 	go func() {
 		for msg := range messagesChan {
 			doc := bson.M{
@@ -52,7 +53,7 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 			}
 		}
 	}()
-	time.Sleep(6 * time.Second) // wait flushPeriod
+	time.Sleep(3 * time.Second) // wait flushPeriod
 	saver.Close()
 	db.log.Debug("Все данные успешно сохранены в MongoDB")
 }
