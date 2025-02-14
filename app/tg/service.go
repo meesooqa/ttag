@@ -1,6 +1,8 @@
 package tg
 
 import (
+	"time"
+
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
@@ -8,7 +10,7 @@ import (
 type ArchivedMessage struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
 	MessageID string             `bson:"message_id" json:"MessageID"`
-	Datetime  string             `bson:"datetime" json:"Datetime"`
+	Datetime  time.Time          `bson:"datetime" json:"Datetime"`
 	Tags      []string           `bson:"tags" json:"Tags"`
 }
 
