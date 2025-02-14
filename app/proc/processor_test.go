@@ -15,13 +15,15 @@ import (
 
 type fakeService struct {
 	callCount int
+	err       error
 }
 
-func (fs *fakeService) ParseArchivedFile(filename string, messagesChan chan<- tg.ArchivedMessage) {
+func (fs *fakeService) ParseArchivedFile(filename string, messagesChan chan<- tg.ArchivedMessage) error {
 	fs.callCount++
 	messagesChan <- tg.ArchivedMessage{
 		MessageID: filename,
 	}
+	return fs.err
 }
 
 type fakeDB struct {
@@ -29,9 +31,10 @@ type fakeDB struct {
 	err         error
 }
 
-func (f *fakeDB) Upsert(message tg.ArchivedMessage) error {
-	f.upsertCalls = append(f.upsertCalls, message)
-	return f.err
+func (f *fakeDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
+	for m := range messagesChan {
+		f.upsertCalls = append(f.upsertCalls, m)
+	}
 }
 
 func TestProcessor_ProcessFile_Success(t *testing.T) {
@@ -58,16 +61,18 @@ func TestProcessor_ProcessFile_Success(t *testing.T) {
 	assert.Equal(t, "file1.txt", fDB.upsertCalls[0].MessageID)
 }
 
-func TestProcessor_ProcessFile_DBError(t *testing.T) {
+func TestProcessor_ProcessFile_Error(t *testing.T) {
 	core, observedLogs := observer.New(zap.ErrorLevel)
 	logger := zap.New(core)
 	processor := NewProcessor(logger)
 
-	fService := &fakeService{}
+	parseErr := errors.New("db upsert error")
+	fService := &fakeService{
+		err: parseErr,
+	}
 	processor.service = fService
 
-	dbErr := errors.New("db upsert error")
-	fDB := &fakeDB{err: dbErr}
+	fDB := &fakeDB{}
 	processor.db = fDB
 
 	filesChan := make(chan string, 1)
@@ -84,10 +89,13 @@ func TestProcessor_ProcessFile_DBError(t *testing.T) {
 
 	var found bool
 	for _, entry := range observedLogs.All() {
-		if entry.Message == "Error processing message" && entry.Context != nil {
-			if errField := entry.Context[0]; errField.Key == "error" /*&& errField.String == dbErr.Error()*/ {
-				found = true
-				break
+		if entry.Message == "Error processing file" && entry.Context != nil {
+			if errField := entry.Context[1]; errField.Key == "error" &&
+				errField.Interface.(error).Error() == parseErr.Error() {
+				if filenameField := entry.Context[0]; filenameField.String == "file2.txt" {
+					found = true
+					break
+				}
 			}
 		}
 	}

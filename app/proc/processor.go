@@ -32,37 +32,15 @@ func (p *Processor) ProcessFile(filesChan <-chan string, wg *sync.WaitGroup) {
 	wgm.Add(1)
 	go func() {
 		defer wgm.Done()
-		p.processMessages(messagesChan)
+		p.db.UpsertMany(messagesChan)
 	}()
 
 	for filename := range filesChan {
-		p.service.ParseArchivedFile(filename, messagesChan)
+		if err := p.service.ParseArchivedFile(filename, messagesChan); err != nil {
+			p.log.Error("Error processing file", zap.String("filename", filename), zap.Error(err))
+		}
 	}
 	close(messagesChan)
 
 	wgm.Wait()
-}
-
-func (p *Processor) processMessages(messagesChan <-chan tg.ArchivedMessage) {
-	var wg sync.WaitGroup
-
-	for message := range messagesChan {
-		wg.Add(1)
-		go func(msg tg.ArchivedMessage) {
-			defer wg.Done()
-			if err := p.processMessage(msg); err != nil {
-				p.log.Error("Error processing message", zap.Error(err))
-			}
-		}(message)
-	}
-
-	wg.Wait()
-}
-
-func (p *Processor) processMessage(message tg.ArchivedMessage) error {
-	err := p.db.Upsert(message)
-	if err != nil {
-		return err
-	}
-	return nil
 }

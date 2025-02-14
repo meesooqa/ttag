@@ -15,7 +15,7 @@ type ArchivedMessage struct {
 }
 
 type Service interface {
-	ParseArchivedFile(filename string, messagesChan chan<- ArchivedMessage)
+	ParseArchivedFile(filename string, messagesChan chan<- ArchivedMessage) error
 }
 
 type TgService struct {
@@ -30,6 +30,6 @@ func NewService(log *zap.Logger) *TgService {
 	}
 }
 
-func (s *TgService) ParseArchivedFile(filename string, messagesChan chan<- ArchivedMessage) {
-	s.parser.ParseFile(filename, messagesChan)
+func (s *TgService) ParseArchivedFile(filename string, messagesChan chan<- ArchivedMessage) error {
+	return s.parser.ParseFile(filename, messagesChan)
 }
