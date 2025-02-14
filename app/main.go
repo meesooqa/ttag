@@ -1,13 +1,14 @@
 package main
 
 import (
-	"github.com/meesooqa/ttag/app/fs"
-	"go.uber.org/zap/zapcore"
 	"os"
 	"sync"
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
+	"github.com/meesooqa/ttag/app/fs"
 )
 
 var logger *zap.Logger
@@ -59,7 +60,8 @@ func initLogger() {
 		EncodeCaller: zapcore.ShortCallerEncoder,
 	}
 	core := zapcore.NewCore(
-		zapcore.NewJSONEncoder(encoderConfig),
+		zapcore.NewConsoleEncoder(encoderConfig),
+		//TODO zapcore.NewJSONEncoder(encoderConfig),
 		writer,
 		zap.DebugLevel, // zap.InfoLevel
 	)
