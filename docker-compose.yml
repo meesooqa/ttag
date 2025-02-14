@@ -1,0 +1,37 @@
+services:
+  mongo:
+    image: mongo:latest
+    container_name: mongodb_ttag
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: db_tags
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+#  app:
+#    build: .
+#    container_name: app_ttag
+#    depends_on:
+#      - mongo
+#    environment:
+#      MONGO_URI: "mongodb://mongo:27017"
+#      DB_NAME: "db_tags"
+#      COLLECTION_NAME: "tags"
+#    volumes:
+#      - ./var/data:/srv/var/data
+#    command: ["/srv/app/ttag"]
+#    logging:
+#      driver: json-file
+#      options:
+#        max-size: "10m"
+#        max-file: "5"
+
+volumes:
+  mongo_data:
