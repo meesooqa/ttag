@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -23,6 +24,8 @@ type Saver struct {
 	batchSize   int
 	flushPeriod time.Duration
 	wg          sync.WaitGroup
+	mu          sync.Mutex
+	closed      bool
 }
 
 // NewSaver создаёт новый Saver с указанными параметрами.
@@ -72,7 +75,6 @@ func (s *Saver) run() {
 
 // saveBatch сохраняет батч документов в MongoDB.
 func (s *Saver) saveBatch(batch []bson.M) {
-	// Приводим []bson.M к []interface{}
 	docs := make([]interface{}, len(batch))
 	for i, doc := range batch {
 		docs[i] = doc
@@ -84,12 +86,23 @@ func (s *Saver) saveBatch(batch []bson.M) {
 }
 
 // Save добавляет документ в очередь сохранения.
-func (s *Saver) Save(doc bson.M) {
+func (s *Saver) Save(doc bson.M) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return errors.New("Saver is closed")
+	}
 	s.dataChan <- doc
+	return nil
 }
 
 // Close завершает работу и сохраняет остатки.
 func (s *Saver) Close() {
-	close(s.dataChan)
+	s.mu.Lock()
+	if !s.closed {
+		s.closed = true
+		close(s.dataChan)
+	}
+	s.mu.Unlock()
 	s.wg.Wait()
 }

@@ -47,9 +47,12 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 				"datetime":   msg.Datetime,
 				"tags":       msg.Tags,
 			}
-			saver.Save(doc)
+			if err := saver.Save(doc); err != nil {
+				db.log.Error("Saver error", zap.Error(err))
+			}
 		}
 	}()
+	time.Sleep(6 * time.Second) // wait flushPeriod
 	saver.Close()
 	db.log.Debug("Все данные успешно сохранены в MongoDB")
 }
