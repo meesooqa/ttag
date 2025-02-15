@@ -67,16 +67,6 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 	db.log.Debug("Все данные успешно сохранены в MongoDB")
 }
 
-// TODO remove method
-func (db *MongoDB) createUniqueMessageIDIndex(ctx context.Context, collection *mongo.Collection) error {
-	indexModel := mongo.IndexModel{
-		Keys:    bson.D{{Key: "message_id", Value: 1}}, // Индекс по возрастанию на поле message_id
-		Options: options.Index().SetUnique(true),
-	}
-	_, err := collection.Indexes().CreateOne(ctx, indexModel)
-	return err
-}
-
 func (db *MongoDB) createUniqueUuidIndex(ctx context.Context, collection *mongo.Collection) error {
 	indexModel := mongo.IndexModel{
 		Keys:    bson.D{{Key: "uuid", Value: 1}},
