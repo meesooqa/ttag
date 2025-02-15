@@ -20,7 +20,7 @@ func main() {
 
 	initLogger()
 
-	path := "var/data/test"
+	path := "var/data" // @see TgArchivedHTMLParser.ParseFile()
 	filesChan := make(chan string, 2)
 
 	logger.Info("Start", zap.String("path", path))
