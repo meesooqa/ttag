@@ -9,9 +9,11 @@ import (
 
 type ArchivedMessage struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	MessageID string             `bson:"message_id" json:"MessageID"`
-	Datetime  time.Time          `bson:"datetime" json:"Datetime"`
-	Tags      []string           `bson:"tags" json:"Tags"`
+	Hash      string             `bson:"hash" json:"hash"`
+	MessageID string             `bson:"message_id" json:"messageID"`
+	Group     string             `bson:"group" json:"group"`
+	Datetime  time.Time          `bson:"datetime" json:"datetime"`
+	Tags      []string           `bson:"tags" json:"tags"`
 }
 
 type Service interface {

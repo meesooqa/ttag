@@ -90,3 +90,27 @@ func TestParseTZOffset(t *testing.T) {
 		})
 	}
 }
+
+func TestObtainGroup(t *testing.T) {
+	logger := zaptest.NewLogger(t)
+	parser := NewTgArchivedHTMLParser(logger)
+
+	testCases := []struct {
+		path     string
+		base     string
+		expected string
+	}{
+		{"var/data/sub/file.txt", "var/data", "sub"},
+		{"/home/gpt/var/data/sub1/sub2/file1.txt", "var/data", "sub1"},
+		{"foo/bar/sub/file.txt", "foo/bar", "sub"},
+		{"var/data/", "var/data", ""},
+		{"some/var/data", "var/data", ""},
+		{"prefix/var/data/subfolder", "var/data", "subfolder"},
+		{"var/data/subfolder/file.txt", "var/data/", "subfolder"},
+	}
+
+	for _, tc := range testCases {
+		result := parser.obtainGroup(tc.path, tc.base)
+		assert.Equal(t, tc.expected, result)
+	}
+}

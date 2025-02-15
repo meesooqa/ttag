@@ -43,6 +43,7 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 	}()
 
 	collection := client.Database("db_tags").Collection("tags")
+	// TODO unique: group + message_id
 	if err := db.createUniqueMessageIDIndex(ctx, collection); err != nil {
 		db.log.Fatal("Ошибка создания индекса:", zap.Error(err))
 	}
@@ -53,6 +54,8 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 			doc := bson.M{
 				"message_id": msg.MessageID,
 				"datetime":   msg.Datetime,
+				"group":      msg.Group,
+				"hash":       msg.Hash,
 				"tags":       msg.Tags,
 			}
 			if err := saver.Save(doc); err != nil {

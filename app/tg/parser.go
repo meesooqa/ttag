@@ -38,6 +38,8 @@ func (p *TgArchivedHTMLParser) ParseFile(filename string, messagesChan chan<- Ar
 		return err
 	}
 
+	group := p.obtainGroup(filename, "var/data")
+
 	doc.Find("div.message.default").Each(func(i int, s *goquery.Selection) {
 		id, exists := s.Attr("id")
 		if !exists {
@@ -82,11 +84,21 @@ func (p *TgArchivedHTMLParser) ParseFile(filename string, messagesChan chan<- Ar
 		messagesChan <- ArchivedMessage{
 			MessageID: id,
 			Datetime:  datetime,
+			Group:     group,
 			Tags:      tags,
 		}
 	})
 
 	return nil
+}
+
+func (p *TgArchivedHTMLParser) obtainHash(path string, base string) string {
+	// hash return p.extractFirstSubfolder(path, base)
+	return ""
+}
+
+func (p *TgArchivedHTMLParser) obtainGroup(path string, base string) string {
+	return p.extractFirstSubfolder(path, base)
 }
 
 // parseTZOffset парсит строку часового пояса формата "UTC±HH:MM" и возвращает смещение в секундах.
@@ -112,4 +124,31 @@ func parseTZOffset(offsetStr string) (int, error) {
 	}
 
 	return totalSeconds, nil
+}
+
+// extractFirstSubfolder возвращает первую подпапку, следующую за каталогом base
+func (p *TgArchivedHTMLParser) extractFirstSubfolder(path string, base string) string {
+	// Нормализуем базовый путь, удаляя возможные ведущие и завершающие слэши.
+	base = strings.Trim(base, "/")
+	baseParts := strings.Split(base, "/")
+	pathParts := strings.Split(path, "/")
+
+	// Ищем последовательное вхождение baseParts в pathParts.
+	// Вычитаем единицу, чтобы после последовательности осталась хотя бы одна часть.
+	for i := 0; i <= len(pathParts)-len(baseParts)-1; i++ {
+		match := true
+		for j, bp := range baseParts {
+			if pathParts[i+j] != bp {
+				match = false
+				break
+			}
+		}
+		if match {
+			// Проверяем, что следующая часть существует и не пуста.
+			if i+len(baseParts) < len(pathParts) && pathParts[i+len(baseParts)] != "" {
+				return pathParts[i+len(baseParts)]
+			}
+		}
+	}
+	return ""
 }
