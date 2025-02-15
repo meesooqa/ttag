@@ -9,11 +9,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 
-	"github.com/meesooqa/ttag/app/tg"
+	"github.com/meesooqa/ttag/app/model"
 )
 
 type DB interface {
-	UpsertMany(messagesChan <-chan tg.ArchivedMessage)
+	UpsertMany(messagesChan <-chan model.ArchivedMessage)
 }
 
 type MongoDB struct {
@@ -30,7 +30,7 @@ func NewMongoDB(log *zap.Logger, database, collection string) *MongoDB {
 	}
 }
 
-func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
+func (db *MongoDB) UpsertMany(messagesChan <-chan model.ArchivedMessage) {
 	batchSize := 10
 	flushPeriod := 2 // Seconds
 

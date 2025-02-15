@@ -11,10 +11,12 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+
+	"github.com/meesooqa/ttag/app/model"
 )
 
 type Parser interface {
-	ParseFile(filename string, messagesChan chan<- ArchivedMessage) error
+	ParseFile(filename string, messagesChan chan<- model.ArchivedMessage) error
 }
 
 type TgArchivedHTMLParser struct {
@@ -27,7 +29,7 @@ func NewTgArchivedHTMLParser(log *zap.Logger) *TgArchivedHTMLParser {
 	}
 }
 
-func (p *TgArchivedHTMLParser) ParseFile(filename string, messagesChan chan<- ArchivedMessage) error {
+func (p *TgArchivedHTMLParser) ParseFile(filename string, messagesChan chan<- model.ArchivedMessage) error {
 	file, err := os.Open(filename)
 	if err != nil {
 		return err
@@ -82,7 +84,7 @@ func (p *TgArchivedHTMLParser) ParseFile(filename string, messagesChan chan<- Ar
 			tags = append(tags, text)
 		})
 
-		messagesChan <- ArchivedMessage{
+		messagesChan <- model.ArchivedMessage{
 			UUID:      p.obtainUUID(id, group),
 			MessageID: id,
 			Datetime:  datetime,

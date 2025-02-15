@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
+
+	"github.com/meesooqa/ttag/app/model"
 )
 
 func TestTgArchivedHTMLParser_ParseFile(t *testing.T) {
@@ -14,19 +16,19 @@ func TestTgArchivedHTMLParser_ParseFile(t *testing.T) {
 	parser := NewTgArchivedHTMLParser(logger)
 	testFile := "testdata/test.html"
 
-	messagesChan := make(chan ArchivedMessage, 10)
+	messagesChan := make(chan model.ArchivedMessage, 10)
 	err := parser.ParseFile(testFile, messagesChan)
 	require.NoError(t, err)
 
 	require.Equal(t, 3, len(messagesChan), "Ожидается, что будет 3 сообщения, полученных из HTML")
 
-	var messages []ArchivedMessage
+	var messages []model.ArchivedMessage
 	for i := 0; i < 3; i++ {
 		msg := <-messagesChan
 		messages = append(messages, msg)
 	}
 
-	var msg2203, msg2204, msg3217 *ArchivedMessage
+	var msg2203, msg2204, msg3217 *model.ArchivedMessage
 	for i := range messages {
 		switch messages[i].MessageID {
 		case "message2203":

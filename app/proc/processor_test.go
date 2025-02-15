@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap/zaptest"
 	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/meesooqa/ttag/app/tg"
+	"github.com/meesooqa/ttag/app/model"
 )
 
 type fakeService struct {
@@ -18,20 +18,20 @@ type fakeService struct {
 	err       error
 }
 
-func (fs *fakeService) ParseArchivedFile(filename string, messagesChan chan<- tg.ArchivedMessage) error {
+func (fs *fakeService) ParseArchivedFile(filename string, messagesChan chan<- model.ArchivedMessage) error {
 	fs.callCount++
-	messagesChan <- tg.ArchivedMessage{
+	messagesChan <- model.ArchivedMessage{
 		MessageID: filename,
 	}
 	return fs.err
 }
 
 type fakeDB struct {
-	upsertCalls []tg.ArchivedMessage
+	upsertCalls []model.ArchivedMessage
 	err         error
 }
 
-func (f *fakeDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
+func (f *fakeDB) UpsertMany(messagesChan <-chan model.ArchivedMessage) {
 	for m := range messagesChan {
 		f.upsertCalls = append(f.upsertCalls, m)
 	}

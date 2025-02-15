@@ -1,23 +1,13 @@
 package tg
 
 import (
-	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
+
+	"github.com/meesooqa/ttag/app/model"
 )
 
-type ArchivedMessage struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	UUID      string             `bson:"uuid" json:"uuid"`
-	MessageID string             `bson:"message_id" json:"messageID"`
-	Group     string             `bson:"group" json:"group"`
-	Datetime  time.Time          `bson:"datetime" json:"datetime"`
-	Tags      []string           `bson:"tags" json:"tags"`
-}
-
 type Service interface {
-	ParseArchivedFile(filename string, messagesChan chan<- ArchivedMessage) error
+	ParseArchivedFile(filename string, messagesChan chan<- model.ArchivedMessage) error
 }
 
 type TgService struct {
@@ -32,6 +22,6 @@ func NewService(log *zap.Logger) *TgService {
 	}
 }
 
-func (s *TgService) ParseArchivedFile(filename string, messagesChan chan<- ArchivedMessage) error {
+func (s *TgService) ParseArchivedFile(filename string, messagesChan chan<- model.ArchivedMessage) error {
 	return s.parser.ParseFile(filename, messagesChan)
 }

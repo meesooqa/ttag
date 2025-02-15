@@ -6,6 +6,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/meesooqa/ttag/app/db"
+	"github.com/meesooqa/ttag/app/model"
 	"github.com/meesooqa/ttag/app/tg"
 )
 
@@ -26,7 +27,7 @@ func NewProcessor(log *zap.Logger, service tg.Service, db db.DB) *Processor {
 func (p *Processor) ProcessFile(filesChan <-chan string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	messagesChan := make(chan tg.ArchivedMessage, 10)
+	messagesChan := make(chan model.ArchivedMessage, 10)
 
 	var wgm sync.WaitGroup
 	wgm.Add(1)
