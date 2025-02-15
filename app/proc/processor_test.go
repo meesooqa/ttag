@@ -39,13 +39,9 @@ func (f *fakeDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 
 func TestProcessor_ProcessFile_Success(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	processor := NewProcessor(logger)
-
 	fService := &fakeService{}
-	processor.service = fService
-
 	fDB := &fakeDB{}
-	processor.db = fDB
+	processor := NewProcessor(logger, fService, fDB)
 
 	filesChan := make(chan string, 1)
 	filesChan <- "file1.txt"
@@ -64,16 +60,12 @@ func TestProcessor_ProcessFile_Success(t *testing.T) {
 func TestProcessor_ProcessFile_Error(t *testing.T) {
 	core, observedLogs := observer.New(zap.ErrorLevel)
 	logger := zap.New(core)
-	processor := NewProcessor(logger)
-
 	parseErr := errors.New("db upsert error")
 	fService := &fakeService{
 		err: parseErr,
 	}
-	processor.service = fService
-
 	fDB := &fakeDB{}
-	processor.db = fDB
+	processor := NewProcessor(logger, fService, fDB)
 
 	filesChan := make(chan string, 1)
 	filesChan <- "file2.txt"

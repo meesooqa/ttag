@@ -17,18 +17,22 @@ type DB interface {
 }
 
 type MongoDB struct {
-	log *zap.Logger
+	log        *zap.Logger
+	database   string
+	collection string
 }
 
-func NewMongoDB(log *zap.Logger) *MongoDB {
+func NewMongoDB(log *zap.Logger, database, collection string) *MongoDB {
 	return &MongoDB{
-		log: log,
+		log:        log,
+		database:   database,
+		collection: collection,
 	}
 }
 
 func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
-	// TODO Refactor UpsertMany
-	db.log.Debug("UpsertMany")
+	batchSize := 10
+	flushPeriod := 2 // Seconds
 
 	ctx := context.TODO()
 	// Подключаемся к MongoDB
@@ -42,12 +46,12 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 		}
 	}()
 
-	collection := client.Database("db_tags").Collection("tags")
+	collection := client.Database(db.database).Collection(db.collection)
 	if err := db.createUniqueUuidIndex(ctx, collection); err != nil {
 		db.log.Fatal("Ошибка создания индекса:", zap.Error(err))
 	}
 
-	saver := NewSaver(db.log, collection, 10, 2*time.Second, 50)
+	saver := NewSaver(db.log, collection, batchSize, time.Duration(flushPeriod)*time.Second, 50)
 	go func() {
 		for msg := range messagesChan {
 			doc := bson.M{
@@ -62,7 +66,7 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 			}
 		}
 	}()
-	time.Sleep(3 * time.Second) // wait flushPeriod
+	time.Sleep(time.Duration(flushPeriod+1) * time.Second) // wait flushPeriod
 	saver.Close()
 	db.log.Debug("Все данные успешно сохранены в MongoDB")
 }

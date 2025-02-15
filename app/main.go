@@ -7,8 +7,10 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/meesooqa/ttag/app/db"
 	"github.com/meesooqa/ttag/app/fs"
 	"github.com/meesooqa/ttag/app/proc"
+	"github.com/meesooqa/ttag/app/tg"
 )
 
 var logger *zap.Logger
@@ -28,7 +30,9 @@ func main() {
 	go finder.FindFiles(path, filesChan, &wg)
 
 	wg.Add(1)
-	processor := proc.NewProcessor(logger)
+	tgService := tg.NewService(logger)
+	mongoDB := db.NewMongoDB(logger, "db_tags", "tags")
+	processor := proc.NewProcessor(logger, tgService, mongoDB)
 	go processor.ProcessFile(filesChan, &wg)
 
 	wg.Wait()

@@ -15,11 +15,11 @@ type Processor struct {
 	db      db.DB
 }
 
-func NewProcessor(log *zap.Logger) *Processor {
+func NewProcessor(log *zap.Logger, service tg.Service, db db.DB) *Processor {
 	return &Processor{
 		log:     log,
-		service: tg.NewService(log),
-		db:      db.NewMongoDB(log),
+		service: service,
+		db:      db,
 	}
 }
 
