@@ -77,20 +77,20 @@ func (s *Saver) run() {
 }
 
 // saveBatch сохраняет батч документов в MongoDB.
-// 1) Если документа с hash нет – вставляем новый.
-// 2) Если документ с hash уже есть:
+// 1) Если документа с UUID нет – вставляем новый.
+// 2) Если документ с UUID уже есть:
 //   - Если tags отличаются – обновляем поле tags (и, например, datetime).
 //   - Если tags совпадают – обновление производится, но фактически документ не меняется.
 func (s *Saver) saveBatch(batch []bson.M) {
 	var models []mongo.WriteModel
 
 	for _, doc := range batch {
-		// Фильтр всегда ищет документ по hash.
-		filter := bson.M{"hash": doc["hash"]}
+		// Фильтр всегда ищет документ по UUID
+		filter := bson.M{"uuid": doc["uuid"]}
 
 		// Операция обновления:
-		// - $set устанавливает поля tags и datetime (при обновлении, если tags изменились)
-		// - $setOnInsert гарантирует, что при вставке будет заполнен hash
+		// - $set устанавливает поля (при обновлении, если tags изменились)
+		// - $setOnInsert гарантирует, что при вставке будет заполнен UUID
 		update := bson.M{
 			"$set": bson.M{
 				"message_id": doc["message_id"],
@@ -99,7 +99,7 @@ func (s *Saver) saveBatch(batch []bson.M) {
 				"tags":       doc["tags"],
 			},
 			"$setOnInsert": bson.M{
-				"hash": doc["hash"],
+				"uuid": doc["uuid"],
 			},
 		}
 

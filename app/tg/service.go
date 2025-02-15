@@ -9,7 +9,7 @@ import (
 
 type ArchivedMessage struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
-	Hash      string             `bson:"hash" json:"hash"`
+	UUID      string             `bson:"uuid" json:"uuid"`
 	MessageID string             `bson:"message_id" json:"messageID"`
 	Group     string             `bson:"group" json:"group"`
 	Datetime  time.Time          `bson:"datetime" json:"datetime"`

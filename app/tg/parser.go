@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -82,6 +83,7 @@ func (p *TgArchivedHTMLParser) ParseFile(filename string, messagesChan chan<- Ar
 		})
 
 		messagesChan <- ArchivedMessage{
+			UUID:      p.obtainUUID(id, group),
 			MessageID: id,
 			Datetime:  datetime,
 			Group:     group,
@@ -92,12 +94,14 @@ func (p *TgArchivedHTMLParser) ParseFile(filename string, messagesChan chan<- Ar
 	return nil
 }
 
-func (p *TgArchivedHTMLParser) obtainHash(path string, base string) string {
-	// hash return p.extractFirstSubfolder(path, base)
-	return ""
+func (p *TgArchivedHTMLParser) obtainUUID(messageId, group string) string {
+	input := messageId + group
+
+	namespace := uuid.NameSpaceURL
+	return uuid.NewSHA1(namespace, []byte(input)).String()
 }
 
-func (p *TgArchivedHTMLParser) obtainGroup(path string, base string) string {
+func (p *TgArchivedHTMLParser) obtainGroup(path, base string) string {
 	return p.extractFirstSubfolder(path, base)
 }
 

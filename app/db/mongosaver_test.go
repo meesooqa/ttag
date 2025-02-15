@@ -65,14 +65,14 @@ func TestSaver_BatchProcessing(t *testing.T) {
 
 	now := time.Now()
 	doc1 := bson.M{
-		"message_id": "msg1",
-		"tags":       []string{"tag1", "tag2"},
-		"datetime":   now,
+		"uuid":     "msg1",
+		"tags":     []string{"tag1", "tag2"},
+		"datetime": now,
 	}
 	doc2 := bson.M{
-		"message_id": "msg2",
-		"tags":       []string{"tag3"},
-		"datetime":   now.Add(time.Minute),
+		"uuid":     "msg2",
+		"tags":     []string{"tag3"},
+		"datetime": now.Add(time.Minute),
 	}
 
 	if err := saver.Save(doc1); err != nil {
@@ -101,7 +101,7 @@ func TestSaver_BatchProcessing(t *testing.T) {
 			t.Errorf("Model %d is not of type *mongo.UpdateOneModel", i)
 			continue
 		}
-		// Фильтр должен искать по "message_id".
+		// Фильтр должен искать по "UUID".
 		filter, ok := updateModel.Filter.(bson.M)
 		if !ok {
 			t.Errorf("Model %d filter is not of type bson.M", i)
@@ -119,8 +119,7 @@ func TestSaver_BatchProcessing(t *testing.T) {
 			expectedTags = []string{"tag3"}
 			expectedDatetime = now.Add(time.Minute)
 		}
-		// expected filter message_id expectedMsgID
-		assert.Equal(t, expectedMsgID, filter["message_id"])
+		assert.Equal(t, expectedMsgID, filter["uuid"], "expected filter UUID expectedMsgID")
 
 		// Проверяем документ обновления.
 		updateDoc, ok := updateModel.Update.(bson.M)
@@ -158,9 +157,6 @@ func TestSaver_BatchProcessing(t *testing.T) {
 		if !ok {
 			t.Errorf("Model %d: datetime is not time.Time", i)
 		}
-		//else if !dt.Equal(expectedDatetime) {
-		//	t.Errorf("Model %d: expected datetime %v, got %v", i, expectedDatetime, dt)
-		//}
 		assert.Equal(t, expectedDatetime, dt)
 
 		// Проверяем секцию $setOnInsert.
@@ -169,7 +165,7 @@ func TestSaver_BatchProcessing(t *testing.T) {
 			t.Errorf("Model %d: $setOnInsert missing or not a bson.M", i)
 			continue
 		}
-		assert.Equal(t, expectedMsgID, setOnInsert["message_id"])
+		assert.Equal(t, expectedMsgID, setOnInsert["uuid"])
 
 		// Проверяем, что Upsert установлен в true.
 		assert.NotNil(t, updateModel.Upsert)
@@ -185,9 +181,9 @@ func TestSaver_FlushPeriod(t *testing.T) {
 
 	now := time.Now()
 	doc := bson.M{
-		"message_id": "msg_flush",
-		"tags":       []string{"flushTag"},
-		"datetime":   now,
+		"uuid":     "msg_flush",
+		"tags":     []string{"flushTag"},
+		"datetime": now,
 	}
 	if err := saver.Save(doc); err != nil {
 		t.Fatalf("Save failed: %v", err)
@@ -198,9 +194,7 @@ func TestSaver_FlushPeriod(t *testing.T) {
 	saver.Close()
 
 	calls := fakeInserter.GetCalls()
-	if len(calls) == 0 {
-		t.Errorf("Expected at least 1 BulkWrite call due to flushPeriod, got 0")
-	}
+	assert.GreaterOrEqual(t, 1, len(calls), "Expected at least 1 BulkWrite call due to flushPeriod, got 0")
 
 	// Проверяем, что документ с "msg_flush" присутствует в одном из вызовов.
 	found := false
@@ -214,15 +208,13 @@ func TestSaver_FlushPeriod(t *testing.T) {
 			if !ok {
 				continue
 			}
-			if filter["message_id"] == "msg_flush" {
+			if filter["uuid"] == "msg_flush" {
 				found = true
 				break
 			}
 		}
 	}
-	if !found {
-		t.Errorf("Document with message_id 'msg_flush' not found in BulkWrite calls")
-	}
+	assert.True(t, found, "Document with UUID 'msg_flush' not found in BulkWrite calls")
 }
 
 // TestSaver_SaveAfterClose проверяет, что вызов Save после закрытия Saver возвращает ошибку.
@@ -232,9 +224,9 @@ func TestSaver_SaveAfterClose(t *testing.T) {
 	saver.Close()
 
 	err := saver.Save(bson.M{
-		"message_id": "msg_after_close",
-		"tags":       []string{"tag"},
-		"datetime":   time.Now(),
+		"uuid":     "msg_after_close",
+		"tags":     []string{"tag"},
+		"datetime": time.Now(),
 	})
 	if err == nil {
 		t.Errorf("Expected error when saving after Close, got nil")

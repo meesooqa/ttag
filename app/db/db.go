@@ -43,8 +43,7 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 	}()
 
 	collection := client.Database("db_tags").Collection("tags")
-	// TODO unique: group + message_id
-	if err := db.createUniqueMessageIDIndex(ctx, collection); err != nil {
+	if err := db.createUniqueUuidIndex(ctx, collection); err != nil {
 		db.log.Fatal("Ошибка создания индекса:", zap.Error(err))
 	}
 
@@ -55,7 +54,7 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 				"message_id": msg.MessageID,
 				"datetime":   msg.Datetime,
 				"group":      msg.Group,
-				"hash":       msg.Hash,
+				"uuid":       msg.UUID,
 				"tags":       msg.Tags,
 			}
 			if err := saver.Save(doc); err != nil {
@@ -68,9 +67,19 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 	db.log.Debug("Все данные успешно сохранены в MongoDB")
 }
 
+// TODO remove method
 func (db *MongoDB) createUniqueMessageIDIndex(ctx context.Context, collection *mongo.Collection) error {
 	indexModel := mongo.IndexModel{
 		Keys:    bson.D{{Key: "message_id", Value: 1}}, // Индекс по возрастанию на поле message_id
+		Options: options.Index().SetUnique(true),
+	}
+	_, err := collection.Indexes().CreateOne(ctx, indexModel)
+	return err
+}
+
+func (db *MongoDB) createUniqueUuidIndex(ctx context.Context, collection *mongo.Collection) error {
+	indexModel := mongo.IndexModel{
+		Keys:    bson.D{{Key: "uuid", Value: 1}},
 		Options: options.Index().SetUnique(true),
 	}
 	_, err := collection.Indexes().CreateOne(ctx, indexModel)

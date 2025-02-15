@@ -84,14 +84,14 @@ func TestSaver_Integration(t *testing.T) {
 
 	now := time.Now()
 	doc1 := bson.M{
-		"message_id": "msg1",
-		"tags":       []string{"tag1", "tag2"},
-		"datetime":   now,
+		"uuid":     "msg1",
+		"tags":     []string{"tag1", "tag2"},
+		"datetime": now,
 	}
 	doc2 := bson.M{
-		"message_id": "msg2",
-		"tags":       []string{"tag3"},
-		"datetime":   now.Add(time.Minute),
+		"uuid":     "msg2",
+		"tags":     []string{"tag3"},
+		"datetime": now.Add(time.Minute),
 	}
 
 	// Добавляем документы
@@ -107,18 +107,18 @@ func TestSaver_Integration(t *testing.T) {
 
 	// Проверяем, что документы вставлены
 	var result1, result2 bson.M
-	if err := collection.FindOne(ctx, bson.M{"message_id": "msg1"}).Decode(&result1); err != nil {
+	if err := collection.FindOne(ctx, bson.M{"uuid": "msg1"}).Decode(&result1); err != nil {
 		t.Fatalf("Failed to find msg1: %v", err)
 	}
-	if err := collection.FindOne(ctx, bson.M{"message_id": "msg2"}).Decode(&result2); err != nil {
+	if err := collection.FindOne(ctx, bson.M{"uuid": "msg2"}).Decode(&result2); err != nil {
 		t.Fatalf("Failed to find msg2: %v", err)
 	}
 
 	// Проверяем обновление: добавляем теги
 	doc1Update := bson.M{
-		"message_id": "msg1",
-		"tags":       []string{"tag1", "tag2", "new_tag"},
-		"datetime":   now.Add(time.Hour),
+		"uuid":     "msg1",
+		"tags":     []string{"tag1", "tag2", "new_tag"},
+		"datetime": now.Add(time.Hour),
 	}
 
 	if err := saver.Save(doc1Update); err != nil {
@@ -130,7 +130,7 @@ func TestSaver_Integration(t *testing.T) {
 
 	// Проверяем, что msg1 обновился
 	var updatedResult1 bson.M
-	if err := collection.FindOne(ctx, bson.M{"message_id": "msg1"}).Decode(&updatedResult1); err != nil {
+	if err := collection.FindOne(ctx, bson.M{"uuid": "msg1"}).Decode(&updatedResult1); err != nil {
 		t.Fatalf("Failed to find updated msg1: %v", err)
 	}
 
