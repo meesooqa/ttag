@@ -2,103 +2,241 @@ package db
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.uber.org/zap"
 )
 
-// fakeCollection реализует Inserter для тестирования.
-type fakeCollection struct {
-	mu         sync.Mutex
-	inserted   [][]bson.M // каждая вставка сохраняется как отдельный батч
-	failInsert bool       // если true, InsertMany возвращает ошибку
+// BulkWriteCall хранит параметры вызова BulkWrite.
+type BulkWriteCall struct {
+	Ctx     context.Context
+	Models  []mongo.WriteModel
+	Options *options.BulkWriteOptions
 }
 
-func (f *fakeCollection) InsertMany(ctx context.Context, docs []interface{}, opts ...*options.InsertManyOptions) (*mongo.InsertManyResult, error) {
+// FakeInserter реализует интерфейс Inserter для тестирования.
+type FakeInserter struct {
+	mu    sync.Mutex
+	Calls []BulkWriteCall
+	// При необходимости можно симулировать ошибку.
+	Err error
+}
+
+func (f *FakeInserter) BulkWrite(ctx context.Context, models []mongo.WriteModel, opts ...*options.BulkWriteOptions) (*mongo.BulkWriteResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	var batch []bson.M
-	for _, doc := range docs {
-		if m, ok := doc.(bson.M); ok {
-			batch = append(batch, m)
+	var bulkOpts *options.BulkWriteOptions
+	if len(opts) > 0 {
+		bulkOpts = opts[0]
+	}
+	call := BulkWriteCall{
+		Ctx:     ctx,
+		Models:  models,
+		Options: bulkOpts,
+	}
+	f.Calls = append(f.Calls, call)
+	// Возвращаем фиктивный результат: считаем, что все операции upsert прошли успешно.
+	result := &mongo.BulkWriteResult{
+		MatchedCount:  0,
+		ModifiedCount: 0,
+		UpsertedCount: int64(len(models)),
+	}
+	return result, f.Err
+}
+
+func (f *FakeInserter) GetCalls() []BulkWriteCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.Calls
+}
+
+// TestSaver_BatchProcessing проверяет, что Saver корректно группирует документы,
+// когда размер батча достигнут, и вызывает BulkWrite с ожидаемыми параметрами.
+func TestSaver_BatchProcessing(t *testing.T) {
+	fakeInserter := &FakeInserter{}
+	// Устанавливаем batchSize = 2 и очень длинный flushPeriod, чтобы не срабатывать по таймеру.
+	saver := NewSaver(zap.NewNop(), fakeInserter, 2, 5*time.Second, 10)
+
+	now := time.Now()
+	doc1 := bson.M{
+		"message_id": "msg1",
+		"tags":       []string{"tag1", "tag2"},
+		"datetime":   now,
+	}
+	doc2 := bson.M{
+		"message_id": "msg2",
+		"tags":       []string{"tag3"},
+		"datetime":   now.Add(time.Minute),
+	}
+
+	if err := saver.Save(doc1); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+	if err := saver.Save(doc2); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	// Закрываем Saver, чтобы сбросить оставшиеся документы.
+	saver.Close()
+
+	calls := fakeInserter.GetCalls()
+	// Expected 1 BulkWrite call
+	assert.Equal(t, 1, len(calls))
+
+	// Ожидаем один вызов BulkWrite с 2-мя моделями.
+	call := calls[0]
+	// Expected 2 models in BulkWrite call
+	assert.Equal(t, 2, len(call.Models))
+
+	// Проверяем каждую модель.
+	for i, model := range call.Models {
+		updateModel, ok := model.(*mongo.UpdateOneModel)
+		if !ok {
+			t.Errorf("Model %d is not of type *mongo.UpdateOneModel", i)
+			continue
+		}
+		// Фильтр должен искать по "message_id".
+		filter, ok := updateModel.Filter.(bson.M)
+		if !ok {
+			t.Errorf("Model %d filter is not of type bson.M", i)
+			continue
+		}
+		var expectedMsgID string
+		var expectedTags []string
+		var expectedDatetime time.Time
+		if i == 0 {
+			expectedMsgID = "msg1"
+			expectedTags = []string{"tag1", "tag2"}
+			expectedDatetime = now
+		} else if i == 1 {
+			expectedMsgID = "msg2"
+			expectedTags = []string{"tag3"}
+			expectedDatetime = now.Add(time.Minute)
+		}
+		// expected filter message_id expectedMsgID
+		assert.Equal(t, expectedMsgID, filter["message_id"])
+
+		// Проверяем документ обновления.
+		updateDoc, ok := updateModel.Update.(bson.M)
+		if !ok {
+			t.Errorf("Model %d update is not of type bson.M", i)
+			continue
+		}
+		// Проверяем секцию $set.
+		setPart, ok := updateDoc["$set"].(bson.M)
+		if !ok {
+			t.Errorf("Model %d: $set part missing or not a bson.M", i)
+			continue
+		}
+		// Проверяем поле tags.
+		tags, ok := setPart["tags"].([]string)
+		if !ok {
+			// Если тип не []string, возможно это bson.A, попробуем преобразовать.
+			arr, ok2 := setPart["tags"].(bson.A)
+			if !ok2 {
+				t.Errorf("Model %d: tags is not []string or bson.A", i)
+				continue
+			}
+			var strTags []string
+			for _, v := range arr {
+				if s, ok3 := v.(string); ok3 {
+					strTags = append(strTags, s)
+				}
+			}
+			tags = strTags
+		}
+		assert.ElementsMatch(t, expectedTags, tags)
+
+		// Проверяем поле datetime.
+		dt, ok := setPart["datetime"].(time.Time)
+		if !ok {
+			t.Errorf("Model %d: datetime is not time.Time", i)
+		}
+		//else if !dt.Equal(expectedDatetime) {
+		//	t.Errorf("Model %d: expected datetime %v, got %v", i, expectedDatetime, dt)
+		//}
+		assert.Equal(t, expectedDatetime, dt)
+
+		// Проверяем секцию $setOnInsert.
+		setOnInsert, ok := updateDoc["$setOnInsert"].(bson.M)
+		if !ok {
+			t.Errorf("Model %d: $setOnInsert missing or not a bson.M", i)
+			continue
+		}
+		assert.Equal(t, expectedMsgID, setOnInsert["message_id"])
+
+		// Проверяем, что Upsert установлен в true.
+		assert.NotNil(t, updateModel.Upsert)
+		assert.True(t, *updateModel.Upsert)
+	}
+}
+
+// TestSaver_FlushPeriod проверяет, что если размер батча не достигнут, то срабатывает flushPeriod.
+func TestSaver_FlushPeriod(t *testing.T) {
+	fakeInserter := &FakeInserter{}
+	// Устанавливаем batchSize = 10, flushPeriod короткий (например, 50мс) и bufferSize = 10.
+	saver := NewSaver(zap.NewNop(), fakeInserter, 10, 50*time.Millisecond, 10)
+
+	now := time.Now()
+	doc := bson.M{
+		"message_id": "msg_flush",
+		"tags":       []string{"flushTag"},
+		"datetime":   now,
+	}
+	if err := saver.Save(doc); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	// Ждем, чтобы flushPeriod сработал.
+	time.Sleep(100 * time.Millisecond)
+	saver.Close()
+
+	calls := fakeInserter.GetCalls()
+	if len(calls) == 0 {
+		t.Errorf("Expected at least 1 BulkWrite call due to flushPeriod, got 0")
+	}
+
+	// Проверяем, что документ с "msg_flush" присутствует в одном из вызовов.
+	found := false
+	for _, call := range calls {
+		for _, model := range call.Models {
+			updateModel, ok := model.(*mongo.UpdateOneModel)
+			if !ok {
+				continue
+			}
+			filter, ok := updateModel.Filter.(bson.M)
+			if !ok {
+				continue
+			}
+			if filter["message_id"] == "msg_flush" {
+				found = true
+				break
+			}
 		}
 	}
-	if f.failInsert {
-		return nil, errors.New("insert error")
-	}
-	f.inserted = append(f.inserted, batch)
-	return &mongo.InsertManyResult{}, nil
-}
-
-// TestSaver_BatchSaving проверяет пакетную вставку по достижению batchSize.
-func TestSaver_BatchSaving(t *testing.T) {
-	fc := &fakeCollection{}
-	saver := NewSaver(fc, 3, 100*time.Millisecond, 10)
-
-	// Отправляем 5 документов.
-	saver.Save(bson.M{"a": 1})
-	saver.Save(bson.M{"a": 2})
-	saver.Save(bson.M{"a": 3}) // первый батч (3 дока)
-	saver.Save(bson.M{"a": 4})
-	saver.Save(bson.M{"a": 5})
-
-	// Ждём, чтобы сработал тикер и завершились вставки.
-	time.Sleep(200 * time.Millisecond)
-	saver.Close()
-
-	fc.mu.Lock()
-	defer fc.mu.Unlock()
-
-	// Ожидаем два батча: первый из 3 документов, второй из 2.
-	if len(fc.inserted) != 2 {
-		t.Fatalf("ожидали 2 батча, получили %d", len(fc.inserted))
-	}
-	if len(fc.inserted[0]) != 3 {
-		t.Errorf("ожидали 3 документа в первом батче, получили %d", len(fc.inserted[0]))
-	}
-	if len(fc.inserted[1]) != 2 {
-		t.Errorf("ожидали 2 документа во втором батче, получили %d", len(fc.inserted[1]))
+	if !found {
+		t.Errorf("Document with message_id 'msg_flush' not found in BulkWrite calls")
 	}
 }
 
-// TestSaver_FlushOnTicker проверяет, что оставшиеся документы сохраняются по таймеру.
-func TestSaver_FlushOnTicker(t *testing.T) {
-	fc := &fakeCollection{}
-	saver := NewSaver(fc, 10, 100*time.Millisecond, 10)
-
-	// Отправляем меньше документов, чем batchSize, чтобы сработал таймер.
-	saver.Save(bson.M{"a": 1})
-	saver.Save(bson.M{"a": 2})
-
-	// Ждём срабатывания flushPeriod.
-	time.Sleep(200 * time.Millisecond)
+// TestSaver_SaveAfterClose проверяет, что вызов Save после закрытия Saver возвращает ошибку.
+func TestSaver_SaveAfterClose(t *testing.T) {
+	fakeInserter := &FakeInserter{}
+	saver := NewSaver(zap.NewNop(), fakeInserter, 2, 5*time.Second, 10)
 	saver.Close()
 
-	fc.mu.Lock()
-	defer fc.mu.Unlock()
-
-	if len(fc.inserted) != 1 {
-		t.Fatalf("ожидали 1 батч, получили %d", len(fc.inserted))
+	err := saver.Save(bson.M{
+		"message_id": "msg_after_close",
+		"tags":       []string{"tag"},
+		"datetime":   time.Now(),
+	})
+	if err == nil {
+		t.Errorf("Expected error when saving after Close, got nil")
 	}
-	if len(fc.inserted[0]) != 2 {
-		t.Errorf("ожидали 2 документа в батче, получили %d", len(fc.inserted[0]))
-	}
-}
-
-// TestSaver_InsertError проверяет, что ошибка вставки не вызывает панику.
-func TestSaver_InsertError(t *testing.T) {
-	fc := &fakeCollection{failInsert: true}
-	saver := NewSaver(fc, 2, 50*time.Millisecond, 10)
-
-	saver.Save(bson.M{"a": 1})
-	saver.Save(bson.M{"a": 2})
-
-	time.Sleep(100 * time.Millisecond)
-	// Если ошибка вставки вызовет панику, тест упадёт.
-	saver.Close()
 }

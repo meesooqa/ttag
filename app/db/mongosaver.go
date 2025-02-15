@@ -1,24 +1,26 @@
+// db/mongosaver.go
 package db
 
 import (
 	"context"
 	"errors"
-	"log"
 	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.uber.org/zap"
 )
 
 // Inserter представляет сущность, поддерживающую пакетную вставку документов.
 type Inserter interface {
-	InsertMany(ctx context.Context, docs []interface{}, opts ...*options.InsertManyOptions) (*mongo.InsertManyResult, error)
+	BulkWrite(ctx context.Context, models []mongo.WriteModel, opts ...*options.BulkWriteOptions) (*mongo.BulkWriteResult, error)
 }
 
 // Saver отвечает за сбор и пакетную отправку данных в MongoDB.
 type Saver struct {
+	log         *zap.Logger
 	collection  Inserter
 	dataChan    chan bson.M
 	batchSize   int
@@ -29,8 +31,9 @@ type Saver struct {
 }
 
 // NewSaver создаёт новый Saver с указанными параметрами.
-func NewSaver(collection Inserter, batchSize int, flushPeriod time.Duration, bufferSize int) *Saver {
+func NewSaver(log *zap.Logger, collection Inserter, batchSize int, flushPeriod time.Duration, bufferSize int) *Saver {
 	s := &Saver{
+		log:         log,
 		collection:  collection,
 		dataChan:    make(chan bson.M, bufferSize),
 		batchSize:   batchSize,
@@ -74,14 +77,44 @@ func (s *Saver) run() {
 }
 
 // saveBatch сохраняет батч документов в MongoDB.
+// 1) Если документа с message_id нет – вставляем новый.
+// 2) Если документ с message_id уже есть:
+//   - Если tags отличаются – обновляем поле tags (и, например, datetime).
+//   - Если tags совпадают – обновление производится, но фактически документ не меняется.
 func (s *Saver) saveBatch(batch []bson.M) {
-	docs := make([]interface{}, len(batch))
-	for i, doc := range batch {
-		docs[i] = doc
+	var models []mongo.WriteModel
+
+	for _, doc := range batch {
+		// Фильтр всегда ищет документ по message_id.
+		filter := bson.M{"message_id": doc["message_id"]}
+
+		// Операция обновления:
+		// - $set устанавливает поля tags и datetime (при обновлении, если tags изменились)
+		// - $setOnInsert гарантирует, что при вставке будет заполнен message_id
+		update := bson.M{
+			"$set": bson.M{
+				"tags":     doc["tags"],
+				"datetime": doc["datetime"],
+			},
+			"$setOnInsert": bson.M{
+				"message_id": doc["message_id"],
+			},
+		}
+
+		// Используем UpdateOne с upsert:true.
+		model := mongo.NewUpdateOneModel().
+			SetFilter(filter).
+			SetUpdate(update).
+			SetUpsert(true)
+
+		models = append(models, model)
 	}
-	_, err := s.collection.InsertMany(context.TODO(), docs)
+
+	opts := options.BulkWrite().SetOrdered(false)
+	result, err := s.collection.BulkWrite(context.TODO(), models, opts)
+	s.log.Debug("BulkWrite result", zap.Any("result", result))
 	if err != nil {
-		log.Println("Mongo InsertMany error:", err)
+		s.log.Error("BulkWrite failed", zap.Error(err))
 	}
 }
 
@@ -90,7 +123,7 @@ func (s *Saver) Save(doc bson.M) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return errors.New("Saver is closed")
+		return errors.New("saver is closed")
 	}
 	s.dataChan <- doc
 	return nil

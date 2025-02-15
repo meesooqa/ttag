@@ -2,12 +2,14 @@ package db
 
 import (
 	"context"
-	"github.com/meesooqa/ttag/app/tg"
+	"time"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
-	"time"
+
+	"github.com/meesooqa/ttag/app/tg"
 )
 
 type DB interface {
@@ -25,22 +27,27 @@ func NewMongoDB(log *zap.Logger) *MongoDB {
 }
 
 func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
-	// TODO UpsertMany
+	// TODO Refactor UpsertMany
 	db.log.Debug("UpsertMany")
 
+	ctx := context.TODO()
 	// Подключаемся к MongoDB
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI("mongodb://localhost:27017"))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
 	if err != nil {
 		db.log.Fatal("Ошибка подключения к MongoDB:", zap.Error(err))
 	}
 	defer func() {
-		if err = client.Disconnect(context.TODO()); err != nil {
+		if err = client.Disconnect(ctx); err != nil {
 			db.log.Fatal("Ошибка отключения от MongoDB:", zap.Error(err))
 		}
 	}()
 
 	collection := client.Database("db_tags").Collection("tags")
-	saver := NewSaver(collection, 10, 2*time.Second, 50)
+	if err := db.createUniqueMessageIDIndex(ctx, collection); err != nil {
+		db.log.Fatal("Ошибка создания индекса:", zap.Error(err))
+	}
+
+	saver := NewSaver(db.log, collection, 10, 2*time.Second, 50)
 	go func() {
 		for msg := range messagesChan {
 			doc := bson.M{
@@ -56,4 +63,13 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan tg.ArchivedMessage) {
 	time.Sleep(3 * time.Second) // wait flushPeriod
 	saver.Close()
 	db.log.Debug("Все данные успешно сохранены в MongoDB")
+}
+
+func (db *MongoDB) createUniqueMessageIDIndex(ctx context.Context, collection *mongo.Collection) error {
+	indexModel := mongo.IndexModel{
+		Keys:    bson.D{{Key: "message_id", Value: 1}}, // Индекс по возрастанию на поле message_id
+		Options: options.Index().SetUnique(true),
+	}
+	_, err := collection.Indexes().CreateOne(ctx, indexModel)
+	return err
 }
