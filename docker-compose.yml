@@ -6,7 +6,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - mongo_data:/data/db
+      - ttag_mongo_data:/data/db
     environment:
       MONGO_INITDB_DATABASE: db_tags
     logging:
@@ -16,4 +16,4 @@ services:
         max-file: "5"
 
 volumes:
-  mongo_data:
+  ttag_mongo_data:
