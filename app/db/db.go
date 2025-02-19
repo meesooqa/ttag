@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -9,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 
+	"github.com/meesooqa/ttag/app/config"
 	"github.com/meesooqa/ttag/app/model"
 )
 
@@ -17,16 +19,15 @@ type DB interface {
 }
 
 type MongoDB struct {
-	log        *zap.Logger
-	database   string
-	collection string
+	log    *zap.Logger
+	conf   *config.MongoConfig
+	client *mongo.Client
 }
 
-func NewMongoDB(log *zap.Logger, database, collection string) *MongoDB {
+func NewMongoDB(log *zap.Logger, conf *config.MongoConfig) *MongoDB {
 	return &MongoDB{
-		log:        log,
-		database:   database,
-		collection: collection,
+		log:  log,
+		conf: conf,
 	}
 }
 
@@ -34,23 +35,7 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan model.Message) {
 	batchSize := 10
 	flushPeriod := 2 // Seconds
 
-	ctx := context.TODO()
-	// Подключаемся к MongoDB
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
-	if err != nil {
-		db.log.Fatal("Ошибка подключения к MongoDB:", zap.Error(err))
-	}
-	defer func() {
-		if err = client.Disconnect(ctx); err != nil {
-			db.log.Fatal("Ошибка отключения от MongoDB:", zap.Error(err))
-		}
-	}()
-
-	collection := client.Database(db.database).Collection(db.collection)
-	if err := db.createUniqueUuidIndex(ctx, collection); err != nil {
-		db.log.Fatal("Ошибка создания индекса:", zap.Error(err))
-	}
-
+	collection := db.GetCollection(db.conf.CollectionMessages)
 	saver := NewSaver(db.log, collection, batchSize, time.Duration(flushPeriod)*time.Second, 50)
 	go func() {
 		for msg := range messagesChan {
@@ -68,10 +53,53 @@ func (db *MongoDB) UpsertMany(messagesChan <-chan model.Message) {
 	}()
 	time.Sleep(time.Duration(flushPeriod+1) * time.Second) // wait flushPeriod
 	saver.Close()
-	db.log.Debug("Все данные успешно сохранены в MongoDB")
+	db.log.Debug("all data has been successfully saved to MongoDB")
 }
 
-func (db *MongoDB) createUniqueUuidIndex(ctx context.Context, collection *mongo.Collection) error {
+func (db *MongoDB) Init() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	connectedClient, err := mongo.Connect(ctx, options.Client().ApplyURI(db.conf.URI))
+	if err != nil {
+		return err
+	}
+
+	err = connectedClient.Ping(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to ping MongoDB: %v", err)
+	}
+
+	db.client = connectedClient
+
+	if err := db.createUniqueUuidIndex(context.TODO()); err != nil {
+		db.log.Fatal("creating index", zap.Error(err))
+	}
+
+	return nil
+}
+
+func (db *MongoDB) Close() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if db.client != nil {
+		if err := db.client.Disconnect(ctx); err != nil {
+			db.log.Error("failed to disconnect MongoDB", zap.Error(err))
+		}
+	}
+}
+
+func (db *MongoDB) GetDatabase() *mongo.Database {
+	return db.client.Database(db.conf.Database)
+}
+
+func (db *MongoDB) GetCollection(collectionName string) *mongo.Collection {
+	return db.GetDatabase().Collection(collectionName)
+}
+
+func (db *MongoDB) createUniqueUuidIndex(ctx context.Context) error {
+	collection := db.GetCollection(db.conf.CollectionMessages)
 	indexModel := mongo.IndexModel{
 		Keys:    bson.D{{Key: "uuid", Value: 1}},
 		Options: options.Index().SetUnique(true),

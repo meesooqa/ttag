@@ -13,7 +13,7 @@ import (
 
 func TestTgArchivedHTMLParser_ParseFile(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	parser := NewTgArchivedHTMLParser(logger)
+	parser := NewTgArchivedHTMLParser(logger, "")
 	testFile := "testdata/test.html"
 
 	messagesChan := make(chan model.Message, 10)
@@ -93,9 +93,9 @@ func TestParseTZOffset(t *testing.T) {
 	}
 }
 
-func TestObtainGroup(t *testing.T) {
+func TestExtractFirstSubfolder(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	parser := NewTgArchivedHTMLParser(logger)
+	parser := NewTgArchivedHTMLParser(logger, "")
 
 	testCases := []struct {
 		path     string
@@ -112,7 +112,7 @@ func TestObtainGroup(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result := parser.obtainGroup(tc.path, tc.base)
+		result := parser.extractFirstSubfolder(tc.path, tc.base)
 		assert.Equal(t, tc.expected, result)
 	}
 }

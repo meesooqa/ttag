@@ -20,12 +20,14 @@ type Parser interface {
 }
 
 type TgArchivedHTMLParser struct {
-	log *zap.Logger
+	log     *zap.Logger
+	baseDir string
 }
 
-func NewTgArchivedHTMLParser(log *zap.Logger) *TgArchivedHTMLParser {
+func NewTgArchivedHTMLParser(log *zap.Logger, baseDir string) *TgArchivedHTMLParser {
 	return &TgArchivedHTMLParser{
-		log: log,
+		log:     log,
+		baseDir: baseDir,
 	}
 }
 
@@ -41,7 +43,7 @@ func (p *TgArchivedHTMLParser) ParseFile(filename string, messagesChan chan<- mo
 		return err
 	}
 
-	group := p.obtainGroup(filename, "var/data")
+	group := p.obtainGroup(filename)
 
 	doc.Find("div.message.default").Each(func(i int, s *goquery.Selection) {
 		id, exists := s.Attr("id")
@@ -103,8 +105,8 @@ func (p *TgArchivedHTMLParser) obtainUUID(messageId, group string) string {
 	return uuid.NewSHA1(namespace, []byte(input)).String()
 }
 
-func (p *TgArchivedHTMLParser) obtainGroup(path, base string) string {
-	return p.extractFirstSubfolder(path, base)
+func (p *TgArchivedHTMLParser) obtainGroup(path string) string {
+	return p.extractFirstSubfolder(path, p.baseDir)
 }
 
 // parseTZOffset парсит строку часового пояса формата "UTC±HH:MM" и возвращает смещение в секундах.

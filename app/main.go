@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/meesooqa/ttag/app/config"
 	"github.com/meesooqa/ttag/app/db"
 	"github.com/meesooqa/ttag/app/fs"
 	"github.com/meesooqa/ttag/app/proc"
@@ -17,26 +18,31 @@ var logger *zap.Logger
 
 func main() {
 	var wg sync.WaitGroup
-
 	initLogger()
+	conf, err := config.Load("etc/config.yml")
+	if err != nil {
+		logger.Error("can't load config", zap.Error(err))
+	}
 
-	path := "var/data" // @see TgArchivedHTMLParser.ParseFile()
+	wg.Add(1)
 	filesChan := make(chan string, 2)
-
-	logger.Info("Start", zap.String("path", path))
-
-	wg.Add(1)
 	finder := fs.NewFinder(logger)
-	go finder.FindFiles(path, filesChan, &wg)
+	go finder.FindFiles(conf.System.DataPath, filesChan, &wg)
 
 	wg.Add(1)
-	tgService := tg.NewService(logger)
-	mongoDB := db.NewMongoDB(logger, "db_tags", "tags")
+	mongoDB := db.NewMongoDB(logger, conf.Mongo)
+	err = mongoDB.Init()
+	if err != nil {
+		logger.Error("db connection failed", zap.Error(err))
+	}
+	defer mongoDB.Close()
+
+	tgService := tg.NewService(logger, conf.System)
 	processor := proc.NewProcessor(logger, tgService, mongoDB)
 	go processor.ProcessFile(filesChan, &wg)
 
 	wg.Wait()
-	logger.Info("All goroutines are done")
+	logger.Info("all goroutines are done")
 }
 
 func initLogger() {
@@ -51,8 +57,7 @@ func initLogger() {
 		EncodeCaller: zapcore.ShortCallerEncoder,
 	}
 	core := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(encoderConfig),
-		//TODO zapcore.NewJSONEncoder(encoderConfig),
+		zapcore.NewJSONEncoder(encoderConfig),
 		writer,
 		zap.DebugLevel, // zap.InfoLevel
 	)
