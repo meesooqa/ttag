@@ -16,19 +16,19 @@ func TestTgArchivedHTMLParser_ParseFile(t *testing.T) {
 	parser := NewTgArchivedHTMLParser(logger)
 	testFile := "testdata/test.html"
 
-	messagesChan := make(chan model.ArchivedMessage, 10)
+	messagesChan := make(chan model.Message, 10)
 	err := parser.ParseFile(testFile, messagesChan)
 	require.NoError(t, err)
 
 	require.Equal(t, 3, len(messagesChan), "Ожидается, что будет 3 сообщения, полученных из HTML")
 
-	var messages []model.ArchivedMessage
+	var messages []model.Message
 	for i := 0; i < 3; i++ {
 		msg := <-messagesChan
 		messages = append(messages, msg)
 	}
 
-	var msg2203, msg2204, msg3217 *model.ArchivedMessage
+	var msg2203, msg2204, msg3217 *model.Message
 	for i := range messages {
 		switch messages[i].MessageID {
 		case "message2203":

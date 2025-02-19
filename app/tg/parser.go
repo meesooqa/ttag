@@ -16,7 +16,7 @@ import (
 )
 
 type Parser interface {
-	ParseFile(filename string, messagesChan chan<- model.ArchivedMessage) error
+	ParseFile(filename string, messagesChan chan<- model.Message) error
 }
 
 type TgArchivedHTMLParser struct {
@@ -29,7 +29,7 @@ func NewTgArchivedHTMLParser(log *zap.Logger) *TgArchivedHTMLParser {
 	}
 }
 
-func (p *TgArchivedHTMLParser) ParseFile(filename string, messagesChan chan<- model.ArchivedMessage) error {
+func (p *TgArchivedHTMLParser) ParseFile(filename string, messagesChan chan<- model.Message) error {
 	file, err := os.Open(filename)
 	if err != nil {
 		return err
@@ -84,7 +84,7 @@ func (p *TgArchivedHTMLParser) ParseFile(filename string, messagesChan chan<- mo
 			tags = append(tags, text)
 		})
 
-		messagesChan <- model.ArchivedMessage{
+		messagesChan <- model.Message{
 			UUID:      p.obtainUUID(id, group),
 			MessageID: id,
 			Datetime:  datetime,

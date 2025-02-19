@@ -27,7 +27,7 @@ func NewProcessor(log *zap.Logger, service tg.Service, db db.DB) *Processor {
 func (p *Processor) ProcessFile(filesChan <-chan string, wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	messagesChan := make(chan model.ArchivedMessage, 10)
+	messagesChan := make(chan model.Message, 10)
 
 	var wgm sync.WaitGroup
 	wgm.Add(1)

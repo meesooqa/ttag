@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-type ArchivedMessage struct {
+// Message represents Telegram exported-to-HTML message
+type Message struct {
 	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
 	UUID      string             `bson:"uuid" json:"uuid"`
 	MessageID string             `bson:"message_id" json:"messageID"`

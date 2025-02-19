@@ -18,20 +18,20 @@ type fakeService struct {
 	err       error
 }
 
-func (fs *fakeService) ParseArchivedFile(filename string, messagesChan chan<- model.ArchivedMessage) error {
+func (fs *fakeService) ParseArchivedFile(filename string, messagesChan chan<- model.Message) error {
 	fs.callCount++
-	messagesChan <- model.ArchivedMessage{
+	messagesChan <- model.Message{
 		MessageID: filename,
 	}
 	return fs.err
 }
 
 type fakeDB struct {
-	upsertCalls []model.ArchivedMessage
+	upsertCalls []model.Message
 	err         error
 }
 
-func (f *fakeDB) UpsertMany(messagesChan <-chan model.ArchivedMessage) {
+func (f *fakeDB) UpsertMany(messagesChan <-chan model.Message) {
 	for m := range messagesChan {
 		f.upsertCalls = append(f.upsertCalls, m)
 	}

@@ -7,7 +7,7 @@ import (
 )
 
 type Service interface {
-	ParseArchivedFile(filename string, messagesChan chan<- model.ArchivedMessage) error
+	ParseArchivedFile(filename string, messagesChan chan<- model.Message) error
 }
 
 type TgService struct {
@@ -22,6 +22,6 @@ func NewService(log *zap.Logger) *TgService {
 	}
 }
 
-func (s *TgService) ParseArchivedFile(filename string, messagesChan chan<- model.ArchivedMessage) error {
+func (s *TgService) ParseArchivedFile(filename string, messagesChan chan<- model.Message) error {
 	return s.parser.ParseFile(filename, messagesChan)
 }

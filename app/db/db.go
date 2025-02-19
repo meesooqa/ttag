@@ -13,7 +13,7 @@ import (
 )
 
 type DB interface {
-	UpsertMany(messagesChan <-chan model.ArchivedMessage)
+	UpsertMany(messagesChan <-chan model.Message)
 }
 
 type MongoDB struct {
@@ -30,7 +30,7 @@ func NewMongoDB(log *zap.Logger, database, collection string) *MongoDB {
 	}
 }
 
-func (db *MongoDB) UpsertMany(messagesChan <-chan model.ArchivedMessage) {
+func (db *MongoDB) UpsertMany(messagesChan <-chan model.Message) {
 	batchSize := 10
 	flushPeriod := 2 // Seconds
 
