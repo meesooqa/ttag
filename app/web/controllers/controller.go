@@ -10,7 +10,12 @@ type Controller interface {
 	Router(mux *http.ServeMux, templates *template.Template)
 }
 
+type TemplateFiller interface {
+	fillTemplateData(r *http.Request)
+}
+
 type BaseController struct {
+	self   TemplateFiller
 	log    *slog.Logger
 	method string
 	route  string
@@ -28,6 +33,7 @@ func (c *BaseController) Router(mux *http.ServeMux, templates *template.Template
 }
 
 func (c *BaseController) handler(w http.ResponseWriter, r *http.Request) {
+	c.self.fillTemplateData(r)
 	if r.Method != c.method {
 		c.log.Error("method is not allowed", "method", c.method, "route", c.route)
 		http.Error(w, "method is not allowed", http.StatusMethodNotAllowed)
@@ -38,33 +44,4 @@ func (c *BaseController) handler(w http.ResponseWriter, r *http.Request) {
 		c.log.Error("executing template", "err", err, "template", c.template, "route", c.route)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-}
-
-type IndexController struct {
-	BaseController
-}
-
-func NewIndexController(log *slog.Logger) *IndexController {
-	groups := map[string]string{
-		"1": "Group Name 100",
-		"2": "Links Group Name",
-		"3": "Group 300",
-	}
-	return &IndexController{BaseController{
-		log:      log,
-		method:   http.MethodGet,
-		route:    "/",
-		template: "index.html",
-		templateData: struct {
-			Title   string
-			Groups  map[string]string
-			Group   string
-			GroupId string
-		}{
-			Title:   "NewIndexController",
-			Groups:  groups,
-			Group:   "",
-			GroupId: "",
-		},
-	}}
 }
