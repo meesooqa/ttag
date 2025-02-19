@@ -1,0 +1,4 @@
+mongo:
+  uri: "mongodb://localhost:27017"
+  database: "database_name"
+  collection_messages: "messages_collection_name"
