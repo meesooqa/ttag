@@ -1,18 +1,19 @@
 package tg
 
 import (
+	"bytes"
+	"log/slog"
 	"testing"
 	"time"
 
+	"github.com/meesooqa/ttag/app/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zaptest"
-
-	"github.com/meesooqa/ttag/app/model"
 )
 
 func TestTgArchivedHTMLParser_ParseFile(t *testing.T) {
-	logger := zaptest.NewLogger(t)
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	parser := NewTgArchivedHTMLParser(logger, "")
 	testFile := "testdata/test.html"
 
@@ -94,7 +95,8 @@ func TestParseTZOffset(t *testing.T) {
 }
 
 func TestExtractFirstSubfolder(t *testing.T) {
-	logger := zaptest.NewLogger(t)
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	parser := NewTgArchivedHTMLParser(logger, "")
 
 	testCases := []struct {

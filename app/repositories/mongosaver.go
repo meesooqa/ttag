@@ -3,13 +3,13 @@ package repositories
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.uber.org/zap"
 )
 
 // Inserter представляет сущность, поддерживающую пакетную вставку документов.
@@ -19,7 +19,7 @@ type Inserter interface {
 
 // Saver отвечает за сбор и пакетную отправку данных в MongoDB.
 type Saver struct {
-	log         *zap.Logger
+	log         *slog.Logger
 	collection  Inserter
 	dataChan    chan bson.M
 	batchSize   int
@@ -30,7 +30,7 @@ type Saver struct {
 }
 
 // NewSaver создаёт новый Saver с указанными параметрами.
-func NewSaver(log *zap.Logger, collection Inserter, batchSize int, flushPeriod time.Duration, bufferSize int) *Saver {
+func NewSaver(log *slog.Logger, collection Inserter, batchSize int, flushPeriod time.Duration, bufferSize int) *Saver {
 	s := &Saver{
 		log:         log,
 		collection:  collection,
@@ -113,9 +113,9 @@ func (s *Saver) saveBatch(batch []bson.M) {
 
 	opts := options.BulkWrite().SetOrdered(false)
 	result, err := s.collection.BulkWrite(context.TODO(), models, opts)
-	s.log.Debug("BulkWrite result", zap.Any("result", result))
+	s.log.Debug("BulkWrite result", "result", result)
 	if err != nil {
-		s.log.Error("BulkWrite failed", zap.Error(err))
+		s.log.Error("BulkWrite failed", "err", err)
 	}
 }
 

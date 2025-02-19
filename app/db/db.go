@@ -3,23 +3,23 @@ package db
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.uber.org/zap"
 
 	"github.com/meesooqa/ttag/app/config"
 )
 
 type MongoDB struct {
-	log    *zap.Logger
+	log    *slog.Logger
 	Conf   *config.MongoConfig
 	client *mongo.Client
 }
 
-func NewMongoDB(log *zap.Logger, conf *config.MongoConfig) *MongoDB {
+func NewMongoDB(log *slog.Logger, conf *config.MongoConfig) *MongoDB {
 	return &MongoDB{
 		log:  log,
 		Conf: conf,
@@ -42,7 +42,7 @@ func (db *MongoDB) Init() error {
 	db.client = connectedClient
 
 	if err := db.createUniqueUuidIndex(context.TODO()); err != nil {
-		db.log.Fatal("creating index", zap.Error(err))
+		db.log.Error("creating index", "err", err)
 	}
 
 	return nil
@@ -54,7 +54,7 @@ func (db *MongoDB) Close() {
 
 	if db.client != nil {
 		if err := db.client.Disconnect(ctx); err != nil {
-			db.log.Error("failed to disconnect MongoDB", zap.Error(err))
+			db.log.Error("failed to disconnect MongoDB", "err", err)
 		}
 	}
 }

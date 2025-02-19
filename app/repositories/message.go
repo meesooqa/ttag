@@ -2,23 +2,23 @@ package repositories
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.uber.org/zap"
 
 	"github.com/meesooqa/ttag/app/model"
 )
 
 type MessageRepository struct {
-	log        *zap.Logger
+	log        *slog.Logger
 	collection *mongo.Collection
 }
 
-func NewMessageRepository(log *zap.Logger, collection *mongo.Collection) *MessageRepository {
+func NewMessageRepository(log *slog.Logger, collection *mongo.Collection) *MessageRepository {
 	return &MessageRepository{
 		log:        log,
 		collection: collection,
@@ -40,7 +40,7 @@ func (r *MessageRepository) UpsertMany(messagesChan <-chan model.Message) {
 				"tags":       msg.Tags,
 			}
 			if err := saver.Save(doc); err != nil {
-				r.log.Error("Saver error", zap.Error(err))
+				r.log.Error("Saver error", "err", err)
 			}
 		}
 	}()

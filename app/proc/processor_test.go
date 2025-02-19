@@ -1,20 +1,21 @@
 package proc
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
+	"log/slog"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
-	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/meesooqa/ttag/app/proc/mocks"
 )
 
 func TestProcessor_ProcessFile_Success(t *testing.T) {
-	logger := zaptest.NewLogger(t)
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	fService := &mocks.ServiceMock{}
 	fRepo := &mocks.RepositoryMock{}
 	processor := NewProcessor(logger, fService, fRepo)
@@ -34,8 +35,8 @@ func TestProcessor_ProcessFile_Success(t *testing.T) {
 }
 
 func TestProcessor_ProcessFile_Error(t *testing.T) {
-	core, observedLogs := observer.New(zap.ErrorLevel)
-	logger := zap.New(core)
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	parseErr := errors.New("db upsert error")
 	fService := &mocks.ServiceMock{
 		Err: parseErr,
@@ -55,17 +56,13 @@ func TestProcessor_ProcessFile_Error(t *testing.T) {
 	assert.Equal(t, 1, fService.CallCount, "Ожидается, что ParseArchivedFile будет вызван один раз")
 	assert.Equal(t, 1, len(fRepo.UpsertCalls), "Ожидается, что одно сообщение будет обработано")
 
-	var found bool
-	for _, entry := range observedLogs.All() {
-		if entry.Message == "Error processing file" && entry.Context != nil {
-			if errField := entry.Context[1]; errField.Key == "error" &&
-				errField.Interface.(error).Error() == parseErr.Error() {
-				if filenameField := entry.Context[0]; filenameField.String == "file2.txt" {
-					found = true
-					break
-				}
-			}
-		}
-	}
-	assert.True(t, found, "Ожидается, что ошибка обработки сообщения будет залогирована")
+	// Получаем JSON-лог
+	logOutput := buf.String()
+	// Десериализуем JSON
+	var logMap map[string]interface{}
+	err := json.Unmarshal([]byte(logOutput), &logMap)
+	assert.NoError(t, err, "Должен быть корректный JSON")
+
+	assert.Equal(t, "error processing file", logMap["msg"], "Ожидается, что ошибка обработки сообщения будет залогирована")
+	assert.Equal(t, "file2.txt", logMap["filename"])
 }

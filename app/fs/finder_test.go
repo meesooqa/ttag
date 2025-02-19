@@ -1,21 +1,21 @@
 package fs
 
 import (
+	"bytes"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestFindFiles_File(t *testing.T) {
-	logger := zap.NewExample()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	finder := NewFinder(logger)
 
 	tmpFile, err := os.CreateTemp("", "testfile_*.txt")
@@ -38,7 +38,8 @@ func TestFindFiles_File(t *testing.T) {
 }
 
 func TestFindFiles_Directory(t *testing.T) {
-	logger := zap.NewExample()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	finder := NewFinder(logger)
 
 	tempDir, err := os.MkdirTemp("", "testdir")
@@ -75,7 +76,8 @@ func TestFindFiles_Directory(t *testing.T) {
 }
 
 func TestFindFiles_NonExistent(t *testing.T) {
-	logger := zap.NewExample()
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	finder := NewFinder(logger)
 
 	nonExistentPath := "/nonexistentpath_123456789"
@@ -94,8 +96,8 @@ func TestFindFiles_NonExistent(t *testing.T) {
 }
 
 func TestFindFiles_NonExistent_Logs(t *testing.T) {
-	core, observedLogs := observer.New(zap.ErrorLevel)
-	logger := zap.New(core)
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	finder := NewFinder(logger)
 
 	nonExistentPath := "/nonexistentpath_123456789"
@@ -109,14 +111,7 @@ func TestFindFiles_NonExistent_Logs(t *testing.T) {
 	}
 	wg.Wait()
 
-	var found bool
-	for _, entry := range observedLogs.All() {
-		if entry.Message == "Can't stat file" {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "Ожидаемое сообщение об ошибке 'Can't stat file' не найдено")
+	assert.Contains(t, buf.String(), "Can't stat file", "Ожидаемое сообщение об ошибке 'Can't stat file' не найдено")
 }
 
 func TestFindFiles_DirectoryWithInaccessibleSubDir(t *testing.T) {
@@ -124,8 +119,8 @@ func TestFindFiles_DirectoryWithInaccessibleSubDir(t *testing.T) {
 		t.Skip("Пропускаем тест для недоступной поддиректории на Windows")
 	}
 
-	core, observedLogs := observer.New(zap.ErrorLevel)
-	logger := zap.New(core)
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	finder := NewFinder(logger)
 
 	tempDir, err := os.MkdirTemp("", "testdir")
@@ -155,15 +150,7 @@ func TestFindFiles_DirectoryWithInaccessibleSubDir(t *testing.T) {
 	wg.Wait()
 
 	assert.Contains(t, files, accessibleFile)
-
-	var found bool
-	for _, entry := range observedLogs.All() {
-		if strings.Contains(entry.Message, "Error while walking") {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "Ожидаемое сообщение об ошибке при обходе недоступной директории не найдено")
+	assert.Contains(t, buf.String(), "error while walking", "Ожидаемое сообщение об ошибке при обходе недоступной директории не найдено")
 
 	err = os.Chmod(inaccessibleDir, 0755)
 	require.NoError(t, err)

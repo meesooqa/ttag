@@ -2,6 +2,7 @@ package tg
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"regexp"
 	"strconv"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 
 	"github.com/meesooqa/ttag/app/model"
 )
@@ -20,11 +20,11 @@ type Parser interface {
 }
 
 type TgArchivedHTMLParser struct {
-	log     *zap.Logger
+	log     *slog.Logger
 	baseDir string
 }
 
-func NewTgArchivedHTMLParser(log *zap.Logger, baseDir string) *TgArchivedHTMLParser {
+func NewTgArchivedHTMLParser(log *slog.Logger, baseDir string) *TgArchivedHTMLParser {
 	return &TgArchivedHTMLParser{
 		log:     log,
 		baseDir: baseDir,

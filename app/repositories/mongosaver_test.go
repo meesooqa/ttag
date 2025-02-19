@@ -1,7 +1,9 @@
 package repositories
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"sync"
 	"testing"
 	"time"
@@ -10,7 +12,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.uber.org/zap"
 )
 
 // BulkWriteCall хранит параметры вызова BulkWrite.
@@ -60,8 +61,10 @@ func (f *FakeInserter) GetCalls() []BulkWriteCall {
 // когда размер батча достигнут, и вызывает BulkWrite с ожидаемыми параметрами.
 func TestSaver_BatchProcessing(t *testing.T) {
 	fakeInserter := &FakeInserter{}
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	// Устанавливаем batchSize = 2 и очень длинный flushPeriod, чтобы не срабатывать по таймеру.
-	saver := NewSaver(zap.NewNop(), fakeInserter, 2, 5*time.Second, 10)
+	saver := NewSaver(logger, fakeInserter, 2, 5*time.Second, 10)
 
 	now := time.Now()
 	doc1 := bson.M{
@@ -176,8 +179,10 @@ func TestSaver_BatchProcessing(t *testing.T) {
 // TestSaver_FlushPeriod проверяет, что если размер батча не достигнут, то срабатывает flushPeriod.
 func TestSaver_FlushPeriod(t *testing.T) {
 	fakeInserter := &FakeInserter{}
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	// Устанавливаем batchSize = 10, flushPeriod короткий (например, 50мс) и bufferSize = 10.
-	saver := NewSaver(zap.NewNop(), fakeInserter, 10, 50*time.Millisecond, 10)
+	saver := NewSaver(logger, fakeInserter, 10, 50*time.Millisecond, 10)
 
 	now := time.Now()
 	doc := bson.M{
@@ -220,7 +225,9 @@ func TestSaver_FlushPeriod(t *testing.T) {
 // TestSaver_SaveAfterClose проверяет, что вызов Save после закрытия Saver возвращает ошибку.
 func TestSaver_SaveAfterClose(t *testing.T) {
 	fakeInserter := &FakeInserter{}
-	saver := NewSaver(zap.NewNop(), fakeInserter, 2, 5*time.Second, 10)
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	saver := NewSaver(logger, fakeInserter, 2, 5*time.Second, 10)
 	saver.Close()
 
 	err := saver.Save(bson.M{

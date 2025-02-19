@@ -1,7 +1,7 @@
 package tg
 
 import (
-	"go.uber.org/zap"
+	"log/slog"
 
 	"github.com/meesooqa/ttag/app/config"
 	"github.com/meesooqa/ttag/app/model"
@@ -12,11 +12,11 @@ type Service interface {
 }
 
 type TgService struct {
-	log    *zap.Logger
+	log    *slog.Logger
 	parser Parser
 }
 
-func NewService(log *zap.Logger, conf *config.SystemConfig) *TgService {
+func NewService(log *slog.Logger, conf *config.SystemConfig) *TgService {
 	return &TgService{
 		log:    log,
 		parser: NewTgArchivedHTMLParser(log, conf.DataPath),

@@ -1,11 +1,10 @@
 package main
 
 import (
+	"log"
+	"log/slog"
 	"os"
 	"sync"
-
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/meesooqa/ttag/app/config"
 	"github.com/meesooqa/ttag/app/db"
@@ -15,14 +14,14 @@ import (
 	"github.com/meesooqa/ttag/app/tg"
 )
 
-var logger *zap.Logger
-
 func main() {
+	logger, cleanup := initLogger("var/log/app.log", slog.LevelDebug) // LevelDebug
+	defer cleanup()
+
 	var wg sync.WaitGroup
-	initLogger()
 	conf, err := config.Load("etc/config.yml")
 	if err != nil {
-		logger.Error("can't load config", zap.Error(err))
+		logger.Error("can't load config", "err", err)
 	}
 
 	wg.Add(1)
@@ -34,7 +33,7 @@ func main() {
 	mongoDB := db.NewMongoDB(logger, conf.Mongo)
 	err = mongoDB.Init()
 	if err != nil {
-		logger.Error("db connection failed", zap.Error(err))
+		logger.Error("db connection failed", "err", err)
 	}
 	defer mongoDB.Close()
 
@@ -47,23 +46,17 @@ func main() {
 	logger.Info("all goroutines are done")
 }
 
-func initLogger() {
-	logFile, _ := os.OpenFile("var/log/app.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	writer := zapcore.AddSync(logFile)
-	encoderConfig := zapcore.EncoderConfig{
-		TimeKey:      "timestamp",
-		LevelKey:     "level",
-		MessageKey:   "message",
-		EncodeTime:   zapcore.ISO8601TimeEncoder,
-		EncodeLevel:  zapcore.CapitalLevelEncoder,
-		EncodeCaller: zapcore.ShortCallerEncoder,
+func initLogger(logFilePath string, level slog.Level) (*slog.Logger, func()) {
+	file, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalf("Не удалось открыть файл для логов: %v", err)
 	}
-	core := zapcore.NewCore(
-		zapcore.NewJSONEncoder(encoderConfig),
-		writer,
-		zap.DebugLevel, // zap.InfoLevel
-	)
-
-	logger = zap.New(core)
-	defer logger.Sync()
+	handler := slog.NewTextHandler(file, &slog.HandlerOptions{
+		Level: level,
+	})
+	logger := slog.New(handler)
+	cleanup := func() {
+		file.Close()
+	}
+	return logger, cleanup
 }

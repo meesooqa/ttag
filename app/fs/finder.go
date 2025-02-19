@@ -1,19 +1,17 @@
 package fs
 
 import (
-	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
-
-	"go.uber.org/zap"
 )
 
 type Finder struct {
-	log *zap.Logger
+	log *slog.Logger
 }
 
-func NewFinder(log *zap.Logger) *Finder {
+func NewFinder(log *slog.Logger) *Finder {
 	return &Finder{log: log}
 }
 
@@ -23,7 +21,7 @@ func (f *Finder) FindFiles(fileOrDirPath string, filesChan chan<- string, wg *sy
 
 	i, e := os.Stat(fileOrDirPath)
 	if e != nil {
-		f.log.Error("Can't stat file", zap.String("fileOrDirPath", fileOrDirPath), zap.Error(e))
+		f.log.Error("Can't stat file", "fileOrDirPath", fileOrDirPath, "err", e.Error())
 		return
 	}
 
@@ -38,7 +36,7 @@ func (f *Finder) FindFiles(fileOrDirPath string, filesChan chan<- string, wg *sy
 func (f *Finder) findFilesInDir(root string, filesChan chan<- string) {
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			f.log.Error(fmt.Sprintf("Error while walking %q: %v\n", path, err))
+			f.log.Error("error while walking", "path", path, "err", err)
 		}
 
 		if !info.IsDir() {
@@ -47,6 +45,6 @@ func (f *Finder) findFilesInDir(root string, filesChan chan<- string) {
 		return nil
 	})
 	if err != nil {
-		f.log.Error(fmt.Sprintf("Directory walk error: %v\n", err))
+		f.log.Error("directory walk error", "err", err)
 	}
 }

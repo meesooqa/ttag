@@ -1,9 +1,8 @@
 package proc
 
 import (
+	"log/slog"
 	"sync"
-
-	"go.uber.org/zap"
 
 	"github.com/meesooqa/ttag/app/model"
 	"github.com/meesooqa/ttag/app/repositories"
@@ -11,12 +10,12 @@ import (
 )
 
 type Processor struct {
-	log     *zap.Logger
+	log     *slog.Logger
 	service tg.Service
 	repo    repositories.Repository
 }
 
-func NewProcessor(log *zap.Logger, service tg.Service, repo repositories.Repository) *Processor {
+func NewProcessor(log *slog.Logger, service tg.Service, repo repositories.Repository) *Processor {
 	return &Processor{
 		log:     log,
 		service: service,
@@ -38,7 +37,7 @@ func (p *Processor) ProcessFile(filesChan <-chan string, wg *sync.WaitGroup) {
 
 	for filename := range filesChan {
 		if err := p.service.ParseArchivedFile(filename, messagesChan); err != nil {
-			p.log.Error("Error processing file", zap.String("filename", filename), zap.Error(err))
+			p.log.Error("error processing file", "filename", filename, "err", err)
 		}
 	}
 	close(messagesChan)

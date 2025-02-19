@@ -1,9 +1,11 @@
 package repositories
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"testing"
 	"time"
@@ -14,7 +16,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.uber.org/zap"
 )
 
 var mongoURI string
@@ -80,7 +81,9 @@ func TestSaver_Integration(t *testing.T) {
 	}
 
 	// Создаём Saver
-	saver := NewSaver(zap.NewNop(), collection, 2, 100*time.Millisecond, 10)
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	saver := NewSaver(logger, collection, 2, 100*time.Millisecond, 10)
 
 	now := time.Now()
 	doc1 := bson.M{
