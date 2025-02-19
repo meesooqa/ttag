@@ -20,7 +20,6 @@ var logger *zap.Logger
 func main() {
 	var wg sync.WaitGroup
 	initLogger()
-	logger.Info("start saving")
 	conf, err := config.Load("etc/config.yml")
 	if err != nil {
 		logger.Error("can't load config", zap.Error(err))
