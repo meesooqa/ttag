@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/meesooqa/ttag/app/repositories"
 	"os"
 	"sync"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/meesooqa/ttag/app/db"
 	"github.com/meesooqa/ttag/app/fs"
 	"github.com/meesooqa/ttag/app/proc"
+	"github.com/meesooqa/ttag/app/repositories"
 	"github.com/meesooqa/ttag/app/tg"
 )
 
