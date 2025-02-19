@@ -29,6 +29,7 @@ services:
 #      - ../.env
     volumes:
       - ../app:/srv/app
+      - ../var:/srv/var
     logging:
       driver: json-file
       options:
