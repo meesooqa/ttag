@@ -1,9 +1,7 @@
 package main
 
 import (
-	"log"
 	"log/slog"
-	"os"
 	"sync"
 
 	"github.com/meesooqa/ttag/app/config"
@@ -15,7 +13,7 @@ import (
 )
 
 func main() {
-	logger, cleanup := initLogger("var/log/app.log", slog.LevelDebug) // LevelDebug
+	logger, cleanup := config.InitLogger("var/log/save.log", slog.LevelDebug) // LevelDebug
 	defer cleanup()
 
 	var wg sync.WaitGroup
@@ -44,19 +42,4 @@ func main() {
 
 	wg.Wait()
 	logger.Info("all goroutines are done")
-}
-
-func initLogger(logFilePath string, level slog.Level) (*slog.Logger, func()) {
-	file, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatalf("Не удалось открыть файл для логов: %v", err)
-	}
-	handler := slog.NewTextHandler(file, &slog.HandlerOptions{
-		Level: level,
-	})
-	logger := slog.New(handler)
-	cleanup := func() {
-		file.Close()
-	}
-	return logger, cleanup
 }
