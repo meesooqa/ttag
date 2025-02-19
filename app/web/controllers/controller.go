@@ -45,15 +45,26 @@ type IndexController struct {
 }
 
 func NewIndexController(log *slog.Logger) *IndexController {
+	groups := map[string]string{
+		"1": "Group Name 100",
+		"2": "Links Group Name",
+		"3": "Group 300",
+	}
 	return &IndexController{BaseController{
 		log:      log,
 		method:   http.MethodGet,
 		route:    "/",
 		template: "index.html",
 		templateData: struct {
-			Title string
+			Title   string
+			Groups  map[string]string
+			Group   string
+			GroupId string
 		}{
-			Title: "NewIndexController",
+			Title:   "NewIndexController",
+			Groups:  groups,
+			Group:   "",
+			GroupId: "",
 		},
 	}}
 }
