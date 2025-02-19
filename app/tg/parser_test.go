@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/meesooqa/ttag/app/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/meesooqa/ttag/app/model"
 )
 
 func TestTgArchivedHTMLParser_ParseFile(t *testing.T) {
