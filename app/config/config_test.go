@@ -14,6 +14,8 @@ func TestLoad(t *testing.T) {
 	assert.Equal(t, "mongodb://localhost:27017", c.Mongo.URI)
 	assert.Equal(t, "database_name", c.Mongo.Database)
 	assert.Equal(t, "messages_collection_name", c.Mongo.CollectionMessages)
+
+	assert.Equal(t, "test/data", c.System.DataPath)
 }
 
 func TestLoadConfigNotFoundFile(t *testing.T) {
