@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/meesooqa/ttag/app/repositories"
 	"os"
 	"sync"
 
@@ -37,8 +38,9 @@ func main() {
 	}
 	defer mongoDB.Close()
 
+	repo := repositories.NewMessageRepository(logger, mongoDB.GetCollectionMessages())
 	tgService := tg.NewService(logger, conf.System)
-	processor := proc.NewProcessor(logger, tgService, mongoDB)
+	processor := proc.NewProcessor(logger, tgService, repo)
 	go processor.ProcessFile(filesChan, &wg)
 
 	wg.Wait()

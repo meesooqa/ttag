@@ -5,22 +5,22 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/meesooqa/ttag/app/db"
 	"github.com/meesooqa/ttag/app/model"
+	"github.com/meesooqa/ttag/app/repositories"
 	"github.com/meesooqa/ttag/app/tg"
 )
 
 type Processor struct {
 	log     *zap.Logger
 	service tg.Service
-	db      db.DB
+	repo    repositories.Repository
 }
 
-func NewProcessor(log *zap.Logger, service tg.Service, db db.DB) *Processor {
+func NewProcessor(log *zap.Logger, service tg.Service, repo repositories.Repository) *Processor {
 	return &Processor{
 		log:     log,
 		service: service,
-		db:      db,
+		repo:    repo,
 	}
 }
 
@@ -33,7 +33,7 @@ func (p *Processor) ProcessFile(filesChan <-chan string, wg *sync.WaitGroup) {
 	wgm.Add(1)
 	go func() {
 		defer wgm.Done()
-		p.db.UpsertMany(messagesChan)
+		p.repo.UpsertMany(messagesChan)
 	}()
 
 	for filename := range filesChan {

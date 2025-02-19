@@ -26,12 +26,12 @@ func (fs *fakeService) ParseArchivedFile(filename string, messagesChan chan<- mo
 	return fs.err
 }
 
-type fakeDB struct {
+type fakeRepo struct {
 	upsertCalls []model.Message
 	err         error
 }
 
-func (f *fakeDB) UpsertMany(messagesChan <-chan model.Message) {
+func (f *fakeRepo) UpsertMany(messagesChan <-chan model.Message) {
 	for m := range messagesChan {
 		f.upsertCalls = append(f.upsertCalls, m)
 	}
@@ -40,8 +40,8 @@ func (f *fakeDB) UpsertMany(messagesChan <-chan model.Message) {
 func TestProcessor_ProcessFile_Success(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	fService := &fakeService{}
-	fDB := &fakeDB{}
-	processor := NewProcessor(logger, fService, fDB)
+	fRepo := &fakeRepo{}
+	processor := NewProcessor(logger, fService, fRepo)
 
 	filesChan := make(chan string, 1)
 	filesChan <- "file1.txt"
@@ -53,8 +53,8 @@ func TestProcessor_ProcessFile_Success(t *testing.T) {
 	wg.Wait()
 
 	assert.Equal(t, 1, fService.callCount, "Ожидается, что ParseArchivedFile будет вызван один раз")
-	assert.Equal(t, 1, len(fDB.upsertCalls), "Ожидается, что одно сообщение будет обработано")
-	assert.Equal(t, "file1.txt", fDB.upsertCalls[0].MessageID)
+	assert.Equal(t, 1, len(fRepo.upsertCalls), "Ожидается, что одно сообщение будет обработано")
+	assert.Equal(t, "file1.txt", fRepo.upsertCalls[0].MessageID)
 }
 
 func TestProcessor_ProcessFile_Error(t *testing.T) {
@@ -64,8 +64,8 @@ func TestProcessor_ProcessFile_Error(t *testing.T) {
 	fService := &fakeService{
 		err: parseErr,
 	}
-	fDB := &fakeDB{}
-	processor := NewProcessor(logger, fService, fDB)
+	fRepo := &fakeRepo{}
+	processor := NewProcessor(logger, fService, fRepo)
 
 	filesChan := make(chan string, 1)
 	filesChan <- "file2.txt"
@@ -77,7 +77,7 @@ func TestProcessor_ProcessFile_Error(t *testing.T) {
 	wg.Wait()
 
 	assert.Equal(t, 1, fService.callCount, "Ожидается, что ParseArchivedFile будет вызван один раз")
-	assert.Equal(t, 1, len(fDB.upsertCalls), "Ожидается, что одно сообщение будет обработано")
+	assert.Equal(t, 1, len(fRepo.upsertCalls), "Ожидается, что одно сообщение будет обработано")
 
 	var found bool
 	for _, entry := range observedLogs.All() {
