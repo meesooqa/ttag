@@ -2,14 +2,15 @@ package repositories
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/meesooqa/ttag/app/db"
 	"github.com/meesooqa/ttag/app/model"
 )
 
@@ -18,10 +19,10 @@ type MessageRepository struct {
 	collection *mongo.Collection
 }
 
-func NewMessageRepository(log *slog.Logger, collection *mongo.Collection) *MessageRepository {
+func NewMessageRepository(log *slog.Logger, db *db.MongoDB) *MessageRepository {
 	return &MessageRepository{
 		log:        log,
-		collection: collection,
+		collection: db.GetCollectionMessages(),
 	}
 }
 
@@ -69,35 +70,20 @@ func (r *MessageRepository) Find(ctx context.Context, filter bson.M, opts ...*op
 	return items, nil
 }
 
-func (r *MessageRepository) Create(ctx context.Context, item *model.Message) error {
-	result, err := r.collection.InsertOne(ctx, item)
+func (r *MessageRepository) GetUniqueValues(ctx context.Context, fieldName string) ([]string, error) {
+	values, err := r.collection.Distinct(ctx, fieldName, bson.D{})
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("distinct failed: %w", err)
 	}
-	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
-		item.ID = oid
-	}
-	return nil
+	return convertToStrings(values), nil
 }
 
-func (r *MessageRepository) GetByID(ctx context.Context, id primitive.ObjectID) (*model.Message, error) {
-	var item model.Message
-	filter := bson.M{"_id": id}
-	err := r.collection.FindOne(ctx, filter).Decode(&item)
-	if err != nil {
-		return nil, err
+func convertToStrings(values []interface{}) []string {
+	result := make([]string, 0, len(values))
+	for _, v := range values {
+		if str, ok := v.(string); ok {
+			result = append(result, str)
+		}
 	}
-	return &item, nil
-}
-
-func (r *MessageRepository) Update(ctx context.Context, id primitive.ObjectID, update bson.M) error {
-	filter := bson.M{"_id": id}
-	_, err := r.collection.UpdateOne(ctx, filter, update)
-	return err
-}
-
-func (r *MessageRepository) Delete(ctx context.Context, id primitive.ObjectID) error {
-	filter := bson.M{"_id": id}
-	_, err := r.collection.DeleteOne(ctx, filter)
-	return err
+	return result
 }

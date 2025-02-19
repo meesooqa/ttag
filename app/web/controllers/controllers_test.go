@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/meesooqa/ttag/app/proc/mocks"
 )
 
 func TestIndexController_Get(t *testing.T) {
@@ -19,7 +21,8 @@ func TestIndexController_Get(t *testing.T) {
 	// Create a new IndexController
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	indexCtrl := NewIndexController(logger)
+	repo := &mocks.RepositoryMock{}
+	indexCtrl := NewIndexController(logger, repo)
 
 	// Set up a ServeMux and register the controller router
 	mux := http.NewServeMux()
@@ -48,7 +51,8 @@ func TestIndexController_MethodNotAllowed(t *testing.T) {
 	// Create a new IndexController
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	indexCtrl := NewIndexController(logger)
+	repo := &mocks.RepositoryMock{}
+	indexCtrl := NewIndexController(logger, repo)
 
 	// Set up a ServeMux and register the controller router
 	mux := http.NewServeMux()
@@ -65,6 +69,6 @@ func TestIndexController_MethodNotAllowed(t *testing.T) {
 	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code, "expected status code 405")
 
 	// Check that the response body contains the method not allowed message
-	expected := "Method not allowed"
+	expected := "method is not allowed"
 	assert.Contains(t, rec.Body.String(), expected, "response body should contain method not allowed message")
 }

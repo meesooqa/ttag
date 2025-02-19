@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/meesooqa/ttag/app/proc/mocks"
 	"github.com/meesooqa/ttag/app/web/controllers"
 )
 
@@ -24,7 +25,8 @@ func TestServer_ControllerRoute(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	// Create an IndexController
-	indexCtrl := controllers.NewIndexController(logger)
+	repo := &mocks.RepositoryMock{}
+	indexCtrl := controllers.NewIndexController(logger, repo)
 
 	// Initialize the server with the controller
 	srv := NewServer(logger, []controllers.Controller{indexCtrl})

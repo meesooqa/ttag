@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	logger, cleanup := config.InitLogger("var/log/save.log", slog.LevelDebug) // LevelDebug
+	logger, cleanup := config.InitLogger("var/log/save.log", slog.LevelDebug)
 	defer cleanup()
 
 	var wg sync.WaitGroup
@@ -35,7 +35,7 @@ func main() {
 	}
 	defer mongoDB.Close()
 
-	repo := repositories.NewMessageRepository(logger, mongoDB.GetCollectionMessages())
+	repo := repositories.NewMessageRepository(logger, mongoDB)
 	tgService := tg.NewService(logger, conf.System)
 	processor := proc.NewProcessor(logger, tgService, repo)
 	go processor.ProcessFile(filesChan, &wg)

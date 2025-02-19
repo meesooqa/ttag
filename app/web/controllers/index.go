@@ -1,21 +1,28 @@
 package controllers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
+
+	"github.com/meesooqa/ttag/app/repositories"
 )
 
 type IndexController struct {
 	BaseController
+	repo repositories.Repository
 }
 
-func NewIndexController(log *slog.Logger) *IndexController {
-	ic := &IndexController{BaseController{
-		log:      log,
-		method:   http.MethodGet,
-		route:    "/",
-		template: "index.html",
-	}}
+func NewIndexController(log *slog.Logger, repo repositories.Repository) *IndexController {
+	ic := &IndexController{
+		BaseController: BaseController{
+			log:      log,
+			method:   http.MethodGet,
+			route:    "/",
+			template: "index.html",
+		},
+		repo: repo,
+	}
 	ic.self = ic
 	return ic
 }
@@ -40,9 +47,16 @@ func (c *IndexController) fillTemplateData(r *http.Request) {
 }
 
 func (c *IndexController) getGroups() map[string]string {
-	return map[string]string{
-		"1": "Group Name 100",
-		"2": "Links Group Name",
-		"3": "Group 300",
+	items, err := c.repo.GetUniqueValues(context.TODO(), "group")
+	if err != nil {
+		c.log.Error(err.Error(), "err", err)
+		return nil
 	}
+
+	result := make(map[string]string, len(items))
+	for _, item := range items {
+		result[item] = item
+	}
+
+	return result
 }
