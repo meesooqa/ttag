@@ -8,10 +8,8 @@ import (
 
 // Conf from config yml
 type Conf struct {
-	Mongo  *MongoConfig `yaml:"mongo"`
-	System struct {
-		DataPath string `yaml:"data_path"`
-	} `yaml:"system"`
+	Mongo  *MongoConfig  `yaml:"mongo"`
+	System *SystemConfig `yaml:"system"`
 }
 
 // MongoDB parameters
@@ -19,6 +17,11 @@ type MongoConfig struct {
 	URI                string `yaml:"uri"`
 	Database           string `yaml:"database"`
 	CollectionMessages string `yaml:"collection_messages"`
+}
+
+// System parameters
+type SystemConfig struct {
+	DataPath string `yaml:"data_path"`
 }
 
 // Load config from file

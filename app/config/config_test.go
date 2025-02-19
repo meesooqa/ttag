@@ -9,12 +9,15 @@ import (
 
 func TestLoad(t *testing.T) {
 	c, err := Load("testdata/config.yml")
+
 	require.NoError(t, err)
 
+	assert.IsType(t, &MongoConfig{}, c.Mongo)
 	assert.Equal(t, "mongodb://localhost:27017", c.Mongo.URI)
 	assert.Equal(t, "database_name", c.Mongo.Database)
 	assert.Equal(t, "messages_collection_name", c.Mongo.CollectionMessages)
 
+	assert.IsType(t, &SystemConfig{}, c.System)
 	assert.Equal(t, "test/data", c.System.DataPath)
 }
 
