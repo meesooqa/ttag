@@ -10,37 +10,13 @@ import (
 	"go.uber.org/zap/zaptest"
 	"go.uber.org/zap/zaptest/observer"
 
-	"github.com/meesooqa/ttag/app/model"
+	"github.com/meesooqa/ttag/app/proc/mocks"
 )
-
-type fakeService struct {
-	callCount int
-	err       error
-}
-
-func (fs *fakeService) ParseArchivedFile(filename string, messagesChan chan<- model.Message) error {
-	fs.callCount++
-	messagesChan <- model.Message{
-		MessageID: filename,
-	}
-	return fs.err
-}
-
-type fakeRepo struct {
-	upsertCalls []model.Message
-	err         error
-}
-
-func (f *fakeRepo) UpsertMany(messagesChan <-chan model.Message) {
-	for m := range messagesChan {
-		f.upsertCalls = append(f.upsertCalls, m)
-	}
-}
 
 func TestProcessor_ProcessFile_Success(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	fService := &fakeService{}
-	fRepo := &fakeRepo{}
+	fService := &mocks.ServiceMock{}
+	fRepo := &mocks.RepositoryMock{}
 	processor := NewProcessor(logger, fService, fRepo)
 
 	filesChan := make(chan string, 1)
@@ -52,19 +28,19 @@ func TestProcessor_ProcessFile_Success(t *testing.T) {
 	processor.ProcessFile(filesChan, &wg)
 	wg.Wait()
 
-	assert.Equal(t, 1, fService.callCount, "Ожидается, что ParseArchivedFile будет вызван один раз")
-	assert.Equal(t, 1, len(fRepo.upsertCalls), "Ожидается, что одно сообщение будет обработано")
-	assert.Equal(t, "file1.txt", fRepo.upsertCalls[0].MessageID)
+	assert.Equal(t, 1, fService.CallCount, "Ожидается, что ParseArchivedFile будет вызван один раз")
+	assert.Equal(t, 1, len(fRepo.UpsertCalls), "Ожидается, что одно сообщение будет обработано")
+	assert.Equal(t, "file1.txt", fRepo.UpsertCalls[0].MessageID)
 }
 
 func TestProcessor_ProcessFile_Error(t *testing.T) {
 	core, observedLogs := observer.New(zap.ErrorLevel)
 	logger := zap.New(core)
 	parseErr := errors.New("db upsert error")
-	fService := &fakeService{
-		err: parseErr,
+	fService := &mocks.ServiceMock{
+		Err: parseErr,
 	}
-	fRepo := &fakeRepo{}
+	fRepo := &mocks.RepositoryMock{}
 	processor := NewProcessor(logger, fService, fRepo)
 
 	filesChan := make(chan string, 1)
@@ -76,8 +52,8 @@ func TestProcessor_ProcessFile_Error(t *testing.T) {
 	processor.ProcessFile(filesChan, &wg)
 	wg.Wait()
 
-	assert.Equal(t, 1, fService.callCount, "Ожидается, что ParseArchivedFile будет вызван один раз")
-	assert.Equal(t, 1, len(fRepo.upsertCalls), "Ожидается, что одно сообщение будет обработано")
+	assert.Equal(t, 1, fService.CallCount, "Ожидается, что ParseArchivedFile будет вызван один раз")
+	assert.Equal(t, 1, len(fRepo.UpsertCalls), "Ожидается, что одно сообщение будет обработано")
 
 	var found bool
 	for _, entry := range observedLogs.All() {
