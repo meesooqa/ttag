@@ -19,6 +19,10 @@ func NewCooccController(log *slog.Logger, tpl Template) *CooccController {
 		contentTpl: "content/co-occ.html",
 	}}
 	c.self = c
+	c.AddChildren(
+		NewCooccPairsController(log, tpl),
+		NewCooccAmController(log, tpl),
+	)
 	return c
 }
 
@@ -29,17 +33,17 @@ func (c *CooccController) fillTemplateData(r *http.Request) {
 		return
 	}
 	c.templateData = struct {
-		Title  string
 		Group  string
 		Groups []GroupItem
 		Menu   []MenuItem
 		// Controller Vars
+		Title    string
 		CooccVar string
 	}{
-		Title:    td.Title,
 		Group:    td.Group,
 		Groups:   td.Groups,
 		Menu:     td.Menu,
+		Title:    c.title,
 		CooccVar: "CooccController::CooccVar",
 	}
 }

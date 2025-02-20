@@ -29,17 +29,17 @@ func (c *IndexController) fillTemplateData(r *http.Request) {
 		return
 	}
 	c.templateData = struct {
-		Title  string
 		Group  string
 		Groups []GroupItem
 		Menu   []MenuItem
 		// Controller Vars
+		Title    string
 		IndexVar string
 	}{
-		Title:    td.Title,
 		Group:    td.Group,
 		Groups:   td.Groups,
 		Menu:     td.Menu,
+		Title:    c.title,
 		IndexVar: "IndexController::IndexVar",
 	}
 }

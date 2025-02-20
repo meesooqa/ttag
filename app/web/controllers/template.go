@@ -83,21 +83,11 @@ func (t *DefaultTemplate) GetData(r *http.Request) TemplateData {
 	queryParams := r.URL.Query()
 	group := queryParams.Get("group")
 	t.data = &DefaultTemplateData{
-		Title:  t.getTitle(r.URL.Path),
 		Groups: t.getGroups(group),
 		Menu:   t.getMenu(r.URL.Path),
 		Group:  group,
 	}
 	return t.data
-}
-
-func (t *DefaultTemplate) getTitle(current string) string {
-	for _, c := range t.menuControllers {
-		if t.isMenuLinkCurrent(current, c.GetRoute()) {
-			return c.GetTitle()
-		}
-	}
-	return t.getDefaultTitle()
 }
 
 func (t *DefaultTemplate) getGroups(group string) []GroupItem {
@@ -127,7 +117,7 @@ func (t *DefaultTemplate) getMenu(current string) []MenuItem {
 			Link:     c.GetRoute(),
 			IsActive: t.isMenuLinkCurrent(current, c.GetRoute()),
 		}
-		if len(c.GetChildren()) > 1 {
+		if len(c.GetChildren()) > 0 {
 			for _, cc := range c.GetChildren() {
 				si := MenuItem{
 					Title:    cc.GetTitle(),

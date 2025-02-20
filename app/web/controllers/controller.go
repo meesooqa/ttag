@@ -14,6 +14,7 @@ type Controller interface {
 	GetRoute() string
 	GetTitle() string
 	GetChildren() []Controller
+	AddChildren(cc ...Controller)
 }
 
 type TemplateFiller interface {
@@ -48,6 +49,10 @@ func (c *BaseController) GetTitle() string {
 
 func (c *BaseController) GetChildren() []Controller {
 	return c.children
+}
+
+func (c *BaseController) AddChildren(cc ...Controller) {
+	c.children = append(c.children, cc...)
 }
 
 func (c *BaseController) handler(w http.ResponseWriter, r *http.Request) {
