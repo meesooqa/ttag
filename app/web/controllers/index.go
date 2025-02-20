@@ -24,4 +24,5 @@ func NewIndexController(log *slog.Logger, tpl Template) *IndexController {
 
 func (c *IndexController) fillTemplateData(r *http.Request) {
 	c.templateData = c.tpl.GetData(r)
+	// TODO IndexVar
 }
