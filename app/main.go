@@ -29,10 +29,15 @@ func main() {
 
 	repo := repositories.NewMessageRepository(logger, mongoDB)
 	tplDefault := controllers.NewDefaultTemplate(logger, repo)
-	cc := []controllers.Controller{
-		controllers.NewIndexController(logger, tplDefault),
-	}
+	cc := provideControllers(logger, tplDefault)
 	tplDefault.SetMenuControllers(cc)
 	server := web.NewServer(logger, cc)
 	server.Run(context.Background(), 8080, tplDefault.GetStaticLocation())
+}
+
+func provideControllers(log *slog.Logger, tpl controllers.Template) []controllers.Controller {
+	return []controllers.Controller{
+		controllers.NewIndexController(log, tpl),
+		controllers.NewCooccController(log, tpl),
+	}
 }
