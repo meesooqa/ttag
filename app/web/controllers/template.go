@@ -120,7 +120,6 @@ func (t *DefaultTemplate) getGroups(group string) []GroupItem {
 }
 
 func (t *DefaultTemplate) getMenu(current string) []MenuItem {
-	// TODO SubItems
 	var result []MenuItem
 	for _, c := range t.menuControllers {
 		mi := MenuItem{
@@ -128,36 +127,20 @@ func (t *DefaultTemplate) getMenu(current string) []MenuItem {
 			Link:     c.GetRoute(),
 			IsActive: t.isMenuLinkCurrent(current, c.GetRoute()),
 		}
+		if len(c.GetChildren()) > 1 {
+			for _, cc := range c.GetChildren() {
+				si := MenuItem{
+					Title:    cc.GetTitle(),
+					Link:     cc.GetRoute(),
+					IsActive: t.isMenuLinkCurrent(current, cc.GetRoute()),
+				}
+				mi.SubItems = append(mi.SubItems, si)
+			}
+		}
 
 		result = append(result, mi)
 	}
 	return result
-	/*/
-	return []MenuItem{
-		{
-			Title:    "Home",
-			Link:     "/",
-			IsActive: false,
-		},
-		{
-			Title:    "Co-occurrence Analysis",
-			Link:     "/co-occ/",
-			IsActive: true,
-			SubItems: []MenuItem{
-				{
-					Title:    "Frequency analysis of pairs",
-					Link:     "/co-occ/pairs/",
-					IsActive: true,
-				},
-				{
-					Title:    "Association measures",
-					Link:     "/co-occ/association-measures/",
-					IsActive: false,
-				},
-			},
-		},
-	}
-	/*/
 }
 
 func (t *DefaultTemplate) isMenuLinkCurrent(current, link string) bool {

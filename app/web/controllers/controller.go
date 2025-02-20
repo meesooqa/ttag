@@ -13,6 +13,7 @@ type Controller interface {
 	Router(mux *http.ServeMux)
 	GetRoute() string
 	GetTitle() string
+	GetChildren() []Controller
 }
 
 type TemplateFiller interface {
@@ -29,6 +30,7 @@ type BaseController struct {
 	contentTpl   string
 	templateData TemplateData
 	templates    *template.Template
+	children     []Controller
 }
 
 func (c *BaseController) Router(mux *http.ServeMux) {
@@ -42,6 +44,10 @@ func (c *BaseController) GetRoute() string {
 
 func (c *BaseController) GetTitle() string {
 	return c.title
+}
+
+func (c *BaseController) GetChildren() []Controller {
+	return c.children
 }
 
 func (c *BaseController) handler(w http.ResponseWriter, r *http.Request) {

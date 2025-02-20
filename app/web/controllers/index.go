@@ -33,7 +33,7 @@ func (c *IndexController) fillTemplateData(r *http.Request) {
 		Group  string
 		Groups []GroupItem
 		Menu   []MenuItem
-		// IndexController Vars
+		// Controller Vars
 		IndexVar string
 	}{
 		Title:    td.Title,
