@@ -49,6 +49,13 @@ func (s *Server) router(staticLocation string) http.Handler {
 
 	// Route
 	for _, controller := range s.controllers {
+		// the children first
+		if len(controller.GetChildren()) > 0 {
+			for _, cc := range controller.GetChildren() {
+				cc.Router(mux)
+			}
+		}
+		// then the parent
 		controller.Router(mux)
 	}
 
