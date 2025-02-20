@@ -17,8 +17,8 @@ RUN go build -o /build/bin/ttag -ldflags "-s -w"
 FROM alpine:latest
 
 COPY --from=builder /build/bin/ttag /srv/ttag
-COPY ../app/web/templates /srv/app/web/templates
-COPY ../app/web/static /srv/app/web/static
+COPY ../templates /srv/templates
+COPY ../static /srv/static
 
 WORKDIR /srv
 EXPOSE 8080

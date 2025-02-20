@@ -28,6 +28,7 @@ services:
 #    volumes:
 #      - ../app:/srv/app
 #      - ../var:/srv/var
+#      - ../templates:/srv/templates
 #    logging:
 #      driver: json-file
 #      options:

@@ -11,6 +11,8 @@ import (
 
 type Controller interface {
 	Router(mux *http.ServeMux)
+	GetRoute() string
+	GetTitle() string
 }
 
 type TemplateFiller interface {
@@ -18,20 +20,28 @@ type TemplateFiller interface {
 }
 
 type BaseController struct {
-	self   TemplateFiller
-	log    *slog.Logger
-	method string
-	route  string
-
-	template     string
+	self         TemplateFiller
+	log          *slog.Logger
+	tpl          Template
+	method       string
+	route        string
+	title        string
+	contentTpl   string
 	templateData TemplateData
-
-	templates *template.Template
+	templates    *template.Template
 }
 
 func (c *BaseController) Router(mux *http.ServeMux) {
 	c.initTemplates()
 	mux.HandleFunc(c.route, c.handler)
+}
+
+func (c *BaseController) GetRoute() string {
+	return c.route
+}
+
+func (c *BaseController) GetTitle() string {
+	return c.title
 }
 
 func (c *BaseController) handler(w http.ResponseWriter, r *http.Request) {
@@ -42,27 +52,27 @@ func (c *BaseController) handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := c.templates.ExecuteTemplate(w, "index.html", &c.templateData); err != nil {
-		c.log.Error("executing template", "err", err, "template", c.template, "route", c.route)
+	if err := c.templates.ExecuteTemplate(w, c.tpl.GetMainTpl(), &c.templateData); err != nil {
+		c.log.Error("executing template", "err", err, "contentTpl", c.contentTpl, "route", c.route)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
 func (c *BaseController) initTemplates() {
-	if c.template == "" {
-		c.template = "content/default.html"
+	if c.contentTpl == "" {
+		c.contentTpl = c.tpl.GetDefaultContentTpl()
 	}
+	tl := c.tpl.GetTemplatesLocation()
 
 	var files []string
 
-	tplDir := "app/web/templates"
-	topLevel, err := fs.Glob(os.DirFS(tplDir), "*.html")
+	topLevel, err := fs.Glob(os.DirFS(tl), "*.html")
 	if err != nil {
 		c.log.Error("find tpls - topLevel", "err", err)
 	}
 	files = append(files, topLevel...)
 
-	subDir, err := fs.Glob(os.DirFS(tplDir), c.template)
+	subDir, err := fs.Glob(os.DirFS(tl), c.contentTpl)
 	if err != nil {
 		c.log.Error("find tpls - subDir", "err", err)
 		log.Fatal(err)
@@ -70,7 +80,7 @@ func (c *BaseController) initTemplates() {
 	files = append(files, subDir...)
 
 	for i, f := range files {
-		files[i] = tplDir + "/" + f
+		files[i] = tl + "/" + f
 	}
 
 	c.templates, err = template.ParseFiles(files...)
