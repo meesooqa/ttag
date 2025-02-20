@@ -27,17 +27,17 @@ type MenuItem struct {
 }
 
 func NewIndexController(log *slog.Logger, repo repositories.Repository) *IndexController {
-	ic := &IndexController{
+	c := &IndexController{
 		BaseController: BaseController{
 			log:      log,
 			method:   http.MethodGet,
 			route:    "/",
-			template: "index.html",
+			template: "content/home.html",
 		},
 		repo: repo,
 	}
-	ic.self = ic
-	return ic
+	c.self = c
+	return c
 }
 
 func (c *IndexController) fillTemplateData(r *http.Request) {
@@ -78,7 +78,7 @@ func (c *IndexController) getGroups(group string) []GroupItem {
 func (c *IndexController) getMenu() []MenuItem {
 	return []MenuItem{
 		{
-			Title: "Main",
+			Title: "Home",
 			Link:  "/",
 		},
 		{

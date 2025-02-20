@@ -13,6 +13,7 @@ import (
 )
 
 func main() {
+	// TODO console logger
 	logger, cleanup := config.InitLogger("var/log/save.log", slog.LevelDebug)
 	defer cleanup()
 

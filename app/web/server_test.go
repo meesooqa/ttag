@@ -2,7 +2,6 @@ package web
 
 import (
 	"bytes"
-	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -17,9 +16,10 @@ import (
 )
 
 func TestServer_ControllerRoute(t *testing.T) {
+	// TODO TestServer_ControllerRoute
 	// Create a template for index
-	tmpl, err := template.New("index.html").Parse("Title: {{.Title}}")
-	assert.NoError(t, err, "failed to create template")
+	//tmpl, err := template.New("index.html").Parse("Title: {{.Title}}")
+	//assert.NoError(t, err, "failed to create template")
 
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -31,7 +31,7 @@ func TestServer_ControllerRoute(t *testing.T) {
 	// Initialize the server with the controller
 	srv := NewServer(logger, []controllers.Controller{indexCtrl})
 	// In tests, manually assign our template
-	srv.templates = tmpl
+	//srv.templates = tmpl
 
 	// Get the server router
 	handler := srv.router()
