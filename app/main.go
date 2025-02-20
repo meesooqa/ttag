@@ -28,8 +28,9 @@ func main() {
 	defer mongoDB.Close()
 
 	repo := repositories.NewMessageRepository(logger, mongoDB)
+	tpl := controllers.NewDefaultTemplate(logger, repo)
 	server := web.NewServer(logger, []controllers.Controller{
-		controllers.NewIndexController(logger, repo),
+		controllers.NewIndexController(logger, tpl),
 	})
 	server.Run(context.Background(), 8080)
 }

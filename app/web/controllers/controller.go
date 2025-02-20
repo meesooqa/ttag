@@ -24,7 +24,7 @@ type BaseController struct {
 	route  string
 
 	template     string
-	templateData any
+	templateData TemplateData
 
 	templates *template.Template
 }
