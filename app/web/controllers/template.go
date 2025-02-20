@@ -120,6 +120,7 @@ func (t *DefaultTemplate) getGroups(group string) []GroupItem {
 }
 
 func (t *DefaultTemplate) getMenu(current string) []MenuItem {
+	// TODO SubItems
 	var result []MenuItem
 	for _, c := range t.menuControllers {
 		mi := MenuItem{
