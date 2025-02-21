@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -28,10 +27,9 @@ type DefaultTemplate struct {
 }
 
 type DefaultTemplateData struct {
-	Title  string
-	Group  string
-	Groups []GroupItem
-	Menu   []MenuItem
+	Title string
+	Group string
+	Menu  []MenuItem
 }
 
 type GroupItem struct {
@@ -83,30 +81,10 @@ func (t *DefaultTemplate) GetData(r *http.Request) TemplateData {
 	queryParams := r.URL.Query()
 	group := queryParams.Get("group")
 	t.data = &DefaultTemplateData{
-		Groups: t.getGroups(group),
-		Menu:   t.getMenu(r.URL.Path),
-		Group:  group,
+		Menu:  t.getMenu(r.URL.Path),
+		Group: group,
 	}
 	return t.data
-}
-
-func (t *DefaultTemplate) getGroups(group string) []GroupItem {
-	items, err := t.repo.GetUniqueValues(context.TODO(), "group")
-	if err != nil {
-		t.log.Error("DefaultTemplate group getting", "err", err)
-		return nil
-	}
-
-	result := make([]GroupItem, len(items))
-	for i, item := range items {
-		result[i] = GroupItem{
-			Title:    item,
-			Value:    item,
-			IsActive: item == group,
-		}
-	}
-
-	return result
 }
 
 func (t *DefaultTemplate) getMenu(current string) []MenuItem {

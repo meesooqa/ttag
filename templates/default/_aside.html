@@ -1,15 +1,6 @@
 <aside class="sidebar">
     <div class="sidebar__group" title="{{.Group}}">
-        <select name="group" id="group">
-            {{if eq .Group ""}}
-            <option disabled selected>— Groups —</option>
-            {{else}}
-            <option disabled>— Groups —</option>
-            {{end}}
-            {{range .Groups}}
-            <option value="{{.Value}}" {{if .IsActive}}selected{{end}}>{{.Title}}</option>
-            {{end}}
-        </select>
+        <select name="group" id="group"></select>
     </div>
     <nav class="sidebar__nav">
         {{if .Menu}}

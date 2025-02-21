@@ -21,7 +21,7 @@ func NewCooccPairsD3ApiController(log *slog.Logger, repo repositories.Repository
 		BaseApiController: BaseApiController{
 			log:    log,
 			method: http.MethodGet,
-			route:  "/api/coocc_pairs_d3",
+			route:  "/api/coocc_pairs_d3.json",
 		},
 		provider: analysis.NewCooccPairsDataProvider(log, repo),
 		adapter:  adapter.NewCooccPairsD3DataAdapter(log),

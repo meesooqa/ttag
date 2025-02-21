@@ -29,15 +29,13 @@ func (c *CooccPairsController) fillTemplateData(r *http.Request) {
 		return
 	}
 	c.templateData = struct {
-		Group  string
-		Groups []GroupItem
-		Menu   []MenuItem
+		Group string
+		Menu  []MenuItem
 		// Controller Vars
 		Title         string
 		CooccPairsVar string
 	}{
 		Group:         td.Group,
-		Groups:        td.Groups,
 		Menu:          td.Menu,
 		Title:         c.title,
 		CooccPairsVar: "CooccPairsController::CooccPairsVar",

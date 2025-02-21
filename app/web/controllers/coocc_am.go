@@ -30,15 +30,13 @@ func (c *CooccAmController) fillTemplateData(r *http.Request) {
 	}
 	// association-measures
 	c.templateData = struct {
-		Group  string
-		Groups []GroupItem
-		Menu   []MenuItem
+		Group string
+		Menu  []MenuItem
 		// Controller Vars
 		Title      string
 		CooccAmVar string
 	}{
 		Group:      td.Group,
-		Groups:     td.Groups,
 		Menu:       td.Menu,
 		Title:      c.title,
 		CooccAmVar: "CooccAmController::CooccAmVar",

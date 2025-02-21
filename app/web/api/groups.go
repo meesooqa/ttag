@@ -18,7 +18,7 @@ func NewGroupsApiController(log *slog.Logger, repo repositories.Repository) *Gro
 		BaseApiController: BaseApiController{
 			log:    log,
 			method: http.MethodGet,
-			route:  "/api/groups",
+			route:  "/api/groups.json",
 		},
 		repo: repo,
 	}
