@@ -3,10 +3,10 @@ package adapter
 import "github.com/meesooqa/ttag/app/analysis"
 
 type D3DataAdapter interface {
-	PrepareData(analyzedData analysis.AnalyzedData) *D3Data
+	PrepareData(analyzedData analysis.AnalyzedData) any
 }
 
-type D3Data struct {
+type D3GraphData struct {
 	Nodes []Node `json:"nodes"`
 	Links []Link `json:"links"`
 }

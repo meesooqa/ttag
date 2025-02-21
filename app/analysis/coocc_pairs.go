@@ -11,20 +11,14 @@ import (
 	"github.com/meesooqa/ttag/app/repositories"
 )
 
-type AnalyzedData interface{}
-
-type AnalyzedDataProvider interface {
-	GetData(ctx context.Context, group string) AnalyzedData
+type CooccPairsDataProvider struct {
+	log  *slog.Logger
+	repo repositories.Repository
 }
 
 type CooccPairsData struct {
 	TagCounts     map[string]int
 	CooccPairsMap map[string]int
-}
-
-type CooccPairsDataProvider struct {
-	log  *slog.Logger
-	repo repositories.Repository
 }
 
 func NewCooccPairsDataProvider(log *slog.Logger, repo repositories.Repository) *CooccPairsDataProvider {

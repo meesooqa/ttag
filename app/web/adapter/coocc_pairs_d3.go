@@ -18,10 +18,10 @@ func NewCooccPairsD3DataAdapter(log *slog.Logger) *CooccPairsD3DataAdapter {
 	}
 }
 
-func (a *CooccPairsD3DataAdapter) PrepareData(analyzedData analysis.AnalyzedData) *D3Data {
+func (a *CooccPairsD3DataAdapter) PrepareData(analyzedData analysis.AnalyzedData) any {
 	data, ok := analyzedData.(*analysis.CooccPairsData)
 	if !ok {
-		a.log.Error("CooccPairs data invalid")
+		a.log.Error("invalid CooccPairs data")
 		return nil
 	}
 
@@ -43,5 +43,5 @@ func (a *CooccPairsD3DataAdapter) PrepareData(analyzedData analysis.AnalyzedData
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Count > nodes[j].Count })
 	sort.Slice(links, func(i, j int) bool { return links[i].Count > links[j].Count })
 
-	return &D3Data{Nodes: nodes, Links: links}
+	return &D3GraphData{Nodes: nodes, Links: links}
 }

@@ -21,6 +21,7 @@ func NewCooccController(log *slog.Logger, tpl Template) *CooccController {
 	c.self = c
 	c.AddChildren(
 		NewCooccPairsController(log, tpl),
+		NewCooccClustersController(log, tpl),
 		NewCooccAmController(log, tpl),
 	)
 	return c

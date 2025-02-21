@@ -41,6 +41,7 @@ func provideApiControllers(log *slog.Logger, repo repositories.Repository) []api
 	return []api.ApiController{
 		api.NewGroupsApiController(log, repo),
 		api.NewCooccPairsD3ApiController(log, repo),
+		api.NewCooccClustersD3ApiController(log, repo),
 	}
 }
 
