@@ -32,12 +32,10 @@ func (c *CooccPairsController) fillTemplateData(r *http.Request) {
 		Group string
 		Menu  []MenuItem
 		// Controller Vars
-		Title         string
-		CooccPairsVar string
+		Title string
 	}{
-		Group:         td.Group,
-		Menu:          td.Menu,
-		Title:         c.title,
-		CooccPairsVar: "CooccPairsController::CooccPairsVar",
+		Group: td.Group,
+		Menu:  td.Menu,
+		Title: c.title,
 	}
 }
