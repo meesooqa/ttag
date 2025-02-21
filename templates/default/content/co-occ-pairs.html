@@ -1,81 +1,133 @@
 {{define "content"}}
-<script src="https://d3js.org/d3.v7.min.js"></script>
 <style>
-    .link {
-        stroke: #999;
-        stroke-opacity: 0.6;
+    .controls {
+        margin: 20px;
+        padding: 10px;
+        background: #f5f5f5;
+        border-radius: 5px;
     }
-    .node {
-        stroke: #fff;
-        stroke-width: 1.5px;
+    .filter-group {
+        margin: 10px 0;
     }
-    .node text {
-        pointer-events: none;
-        font: 12px sans-serif;
-        fill: #333;
-        font-weight: bold;
+    label {
+        margin-right: 10px;
     }
-    .node circle {
-        fill: #69b3a2;
-        stroke: #333;
-        stroke-width: 1.5px;
+    #slider-value {
+        display: inline-block;
+        min-width: 50px;
     }
+    .link { stroke: #999; stroke-opacity: 0.6; }
+    .node { stroke: #fff; stroke-width: 1.5px; }
+    .node text { pointer-events: none; font: 12px sans-serif; }
 </style>
+<div class="controls">
+    <div class="filter-group">
+        <label>Минимальная частота тега:</label>
+        <input type="range" id="frequency-slider" min="1" max="100" value="1">
+        <span id="slider-value">1</span>
+    </div>
+</div>
+
 <script>
-    fetch('/api/coocc_pairs_d3')
-        .then(response => response.json())
-        .then(data => {
-            const width = 1200, height = 800;
+document.addEventListener('DOMContentLoaded', function() {
 
-            const svg = d3.select("#content").append("svg")
-                .attr("width", width)
-                .attr("height", height);
+    let currentData = null;
+    let simulation = null;
 
-            const nodes = data.nodes;
-            const links = data.links;
+    // Инициализация слайдера
+    const slider = document.getElementById('frequency-slider');
+    const sliderValue = document.getElementById('slider-value');
 
-            const simulation = d3.forceSimulation(nodes)
-                .force("link", d3.forceLink(links).id(d => d.id).distance(100))
-                .force("charge", d3.forceManyBody().strength(-1000))
-                .force("center", d3.forceCenter(width / 2, height / 2));
+    slider.addEventListener('input', function() {
+        sliderValue.textContent = this.value;
+        updateVisualization(currentData);
+    });
 
-            // Рисуем связи
-            const link = svg.append("g")
-                .selectAll("line")
-                .data(links)
-                .enter().append("line")
-                .attr("class", "link")
-                .attr("stroke-width", d => Math.sqrt(d.count));
+    // Обработчик выбора группы
+    d3.select('#group').on('change', function() {
+        const group = this.value;
+        loadData(group);
+    });
 
-            // Рисуем узлы
-            const node = svg.append("g")
-                .selectAll("g")
-                .data(nodes)
-                .enter().append("g");
+    // Загрузка данных
+    function loadData(group) {
+        const url = group ? `/api/coocc_pairs_d3.json?group=${encodeURIComponent(group)}` : '/api/coocc_pairs_d3.json';
 
-            // Добавляем кружки для узлов
-            node.append("circle")
-                .attr("class", "node")
-                .attr("r", d => Math.sqrt(d.count) * 2)
-                .attr("fill", "#69b3a2");
-
-            // Добавляем подписи для узлов
-            node.append("text")
-                .text(d => d.id)
-                .attr("x", 10) // Смещение текста относительно кружка
-                .attr("y", 5);  // Смещение текста относительно кружка
-
-            // Обновляем позиции элементов на каждом тике симуляции
-            simulation.on("tick", () => {
-                link
-                    .attr("x1", d => d.source.x)
-                    .attr("y1", d => d.source.y)
-                    .attr("x2", d => d.target.x)
-                    .attr("y2", d => d.target.y);
-
-                node
-                    .attr("transform", d => `translate(${d.x},${d.y})`);
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                currentData = data;
+                slider.max = Math.max(...data.nodes.map(n => n.count));
+                updateVisualization(data);
             });
+    }
+
+    // Обновление визуализации
+    function updateVisualization(data) {
+        const minFrequency = parseInt(slider.value);
+
+        // Фильтрация данных
+        const filteredNodes = data.nodes.filter(n => n.count >= minFrequency);
+        const filteredLinks = data.links.filter(l =>
+            filteredNodes.some(n => n.id === l.source) &&
+            filteredNodes.some(n => n.id === l.target)
+        );
+
+        // Очистка предыдущей визуализации
+        d3.select('svg').remove();
+
+        // Создание нового SVG
+        const width = 2000, height = 2000;
+        const svg = d3.select("#content").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        // Создание симуляции
+        simulation = d3.forceSimulation(filteredNodes)
+            .force("link", d3.forceLink(filteredLinks).id(d => d.id).distance(100))
+            .force("charge", d3.forceManyBody().strength(-1000))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        // Отрисовка связей
+        const link = svg.append("g")
+            .selectAll("line")
+            .data(filteredLinks)
+            .enter().append("line")
+            .attr("class", "link")
+            .attr("stroke-width", d => Math.sqrt(d.count));
+
+        // Отрисовка узлов
+        const node = svg.append("g")
+            .selectAll("g")
+            .data(filteredNodes)
+            .enter().append("g");
+
+        node.append("circle")
+            .attr("class", "node")
+            .attr("r", d => Math.sqrt(d.count) * 2)
+            .attr("fill", "#69b3a2");
+
+        node.append("text")
+            .text(d => d.id)
+            .attr("x", 10)
+            .attr("y", 5);
+
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node
+                .attr("transform", d => `translate(${d.x},${d.y})`);
         });
+    }
+
+    // Первоначальная загрузка данных
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialGroup = urlParams.get('group') || '';
+    loadData(initialGroup);
+})
 </script>
 {{end}}
