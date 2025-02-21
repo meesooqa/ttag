@@ -1,3 +1,81 @@
 {{define "content"}}
-<p>{{.CooccPairsVar}}</p>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+    .link {
+        stroke: #999;
+        stroke-opacity: 0.6;
+    }
+    .node {
+        stroke: #fff;
+        stroke-width: 1.5px;
+    }
+    .node text {
+        pointer-events: none;
+        font: 12px sans-serif;
+        fill: #333;
+        font-weight: bold;
+    }
+    .node circle {
+        fill: #69b3a2;
+        stroke: #333;
+        stroke-width: 1.5px;
+    }
+</style>
+<script>
+    fetch('/api/coocc_pairs_d3')
+        .then(response => response.json())
+        .then(data => {
+            const width = 1200, height = 800;
+
+            const svg = d3.select("#content").append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const nodes = data.nodes;
+            const links = data.links;
+
+            const simulation = d3.forceSimulation(nodes)
+                .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-1000))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            // Рисуем связи
+            const link = svg.append("g")
+                .selectAll("line")
+                .data(links)
+                .enter().append("line")
+                .attr("class", "link")
+                .attr("stroke-width", d => Math.sqrt(d.count));
+
+            // Рисуем узлы
+            const node = svg.append("g")
+                .selectAll("g")
+                .data(nodes)
+                .enter().append("g");
+
+            // Добавляем кружки для узлов
+            node.append("circle")
+                .attr("class", "node")
+                .attr("r", d => Math.sqrt(d.count) * 2)
+                .attr("fill", "#69b3a2");
+
+            // Добавляем подписи для узлов
+            node.append("text")
+                .text(d => d.id)
+                .attr("x", 10) // Смещение текста относительно кружка
+                .attr("y", 5);  // Смещение текста относительно кружка
+
+            // Обновляем позиции элементов на каждом тике симуляции
+            simulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+        });
+</script>
 {{end}}

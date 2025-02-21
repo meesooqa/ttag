@@ -7,20 +7,23 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/meesooqa/ttag/app/web/api"
 	"github.com/meesooqa/ttag/app/web/controllers"
 )
 
 type Server struct {
-	log         *slog.Logger
-	controllers []controllers.Controller
+	log            *slog.Logger
+	apiControllers []api.ApiController
+	controllers    []controllers.Controller
 
 	httpServer *http.Server
 }
 
-func NewServer(log *slog.Logger, controllers []controllers.Controller) *Server {
+func NewServer(log *slog.Logger, apiControllers []api.ApiController, controllers []controllers.Controller) *Server {
 	return &Server{
-		log:         log,
-		controllers: controllers,
+		log:            log,
+		controllers:    controllers,
+		apiControllers: apiControllers,
 	}
 }
 
@@ -48,6 +51,11 @@ func (s *Server) router(staticLocation string) http.Handler {
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(staticLocation))))
 
 	// Route
+	// handle api endpoints
+	for _, apiController := range s.apiControllers {
+		apiController.Router(mux)
+	}
+	// web pages
 	for _, controller := range s.controllers {
 		// the children first
 		if len(controller.GetChildren()) > 0 {

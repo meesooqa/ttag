@@ -8,6 +8,7 @@ import (
 	"github.com/meesooqa/ttag/app/db"
 	"github.com/meesooqa/ttag/app/repositories"
 	"github.com/meesooqa/ttag/app/web"
+	"github.com/meesooqa/ttag/app/web/api"
 	"github.com/meesooqa/ttag/app/web/controllers"
 )
 
@@ -28,11 +29,18 @@ func main() {
 	defer mongoDB.Close()
 
 	repo := repositories.NewMessageRepository(logger, mongoDB)
+	cca := provideApiControllers(logger, repo)
 	tplDefault := controllers.NewDefaultTemplate(logger, repo)
 	cc := provideControllers(logger, tplDefault)
 	tplDefault.SetMenuControllers(cc)
-	server := web.NewServer(logger, cc)
+	server := web.NewServer(logger, cca, cc)
 	server.Run(context.Background(), 8080, tplDefault.GetStaticLocation())
+}
+
+func provideApiControllers(log *slog.Logger, repo repositories.Repository) []api.ApiController {
+	return []api.ApiController{
+		api.NewCooccPairsD3ApiController(log, repo),
+	}
 }
 
 func provideControllers(log *slog.Logger, tpl controllers.Template) []controllers.Controller {
