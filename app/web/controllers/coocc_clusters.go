@@ -9,6 +9,7 @@ type CooccClustersController struct {
 	BaseController
 }
 
+// Кластеризация тегов
 func NewCooccClustersController(log *slog.Logger, tpl Template) *CooccClustersController {
 	c := &CooccClustersController{BaseController{
 		log:        log,

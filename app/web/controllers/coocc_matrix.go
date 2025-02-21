@@ -9,6 +9,7 @@ type CooccMatrixController struct {
 	BaseController
 }
 
+// Матрица совместной встречаемости
 func NewCooccMatrixController(log *slog.Logger, tpl Template) *CooccMatrixController {
 	c := &CooccMatrixController{BaseController{
 		log:        log,

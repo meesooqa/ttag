@@ -9,6 +9,7 @@ type CooccPairsController struct {
 	BaseController
 }
 
+// Теги Co-occurrence
 func NewCooccPairsController(log *slog.Logger, tpl Template) *CooccPairsController {
 	c := &CooccPairsController{BaseController{
 		log:        log,
