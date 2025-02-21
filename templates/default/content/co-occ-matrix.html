@@ -1,140 +1,233 @@
 {{define "content"}}
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
+<style>
+    .heatmap-container {
+        margin: 50px;
+        overflow: auto;
+    }
 
-    });
-</script>
-    <title>Матрица совместной встречаемости</title>
-    <style>
-        .heatmap-container {
-            margin: 50px;
-            overflow: auto;
-        }
+    .cell {
+        stroke: #fff;
+    }
 
-        .cell {
-            stroke: #fff;
-        }
+    .axis text {
+        font: 10px sans-serif;
+    }
 
-        .axis text {
-            font: 10px sans-serif;
-        }
+    .axis path,
+    .axis line {
+        fill: none;
+        stroke: #000;
+        shape-rendering: crispEdges;
+    }
 
-        .axis path,
-        .axis line {
-            fill: none;
-            stroke: #000;
-            shape-rendering: crispEdges;
-        }
-
-        .legend text {
-            font: 9px sans-serif;
-        }
-    </style>
+    .legend text {
+        font: 9px sans-serif;
+    }
+    /* Добавляем стили для тултипа */
+    .tooltip {
+        position: absolute;
+        padding: 8px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        border-radius: 4px;
+        pointer-events: none;
+        font: 12px sans-serif;
+    }
+    /* Стили для управления */
+    .controls {
+        margin: 20px;
+        padding: 10px;
+        background: #f5f5f5;
+        border-radius: 4px;
+    }
+    .zoom-buttons button {
+        margin: 0 5px;
+        padding: 5px 10px;
+        cursor: pointer;
+    }
+</style>
+<div class="controls">
+    <div class="sort-control">
+        <label>Сортировка:</label>
+        <select id="sort-select">
+            <option value="frequency">По частоте</option>
+            <option value="alphabetical">По алфавиту</option>
+        </select>
+    </div>
+    <div class="zoom-buttons">
+        <button onclick="zoomIn()">+ Увеличить</button>
+        <button onclick="zoomOut()">- Уменьшить</button>
+        <button onclick="resetZoom()">Сброс</button>
+    </div>
+</div>
 <div class="heatmap-container">
     <div id="heatmap"></div>
 </div>
+<div id="tooltip" class="tooltip"></div>
 
 <script>
-    const width = 2000;
-    const height = 2000;
-    const margin = {top: 80, right: 30, bottom: 100, left: 100};
-    const cellSize = 20;
+    document.addEventListener('DOMContentLoaded', function() {
+        let currentData = null;
+        let currentTransform = d3.zoomIdentity;
+        let svg, xScale, yScale, colorScale;
+        const width = 4000;
+        const height = 4000;
+        const margin = {top: 80, right: 30, bottom: 100, left: 100};
 
-    const svg = d3.select("#heatmap")
-        .append("svg")
-        .attr("width", width)
-        .attr("height", height);
+        // Инициализация
+        function initVisualization() {
+            svg = d3.select("#heatmap")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .call(d3.zoom()
+                    .scaleExtent([0.5, 8])
+                    .on("zoom", (event) => {
+                        currentTransform = event.transform;
+                        svg.attr("transform", currentTransform);
+                    }))
+                .append("g");
 
-    // Загрузка данных
-    fetch('/api/matrix')
-        .then(response => response.json())
-        .then(data => {
-            const {tags, matrix} = data;
+            // Инициализация элементов
+            svg.append("g").attr("class", "x axis");
+            svg.append("g").attr("class", "y axis");
+        }
 
-            // Цветовая шкала
-            const colorScale = d3.scaleSequential()
-                .interpolator(d3.interpolateYlOrRd)
-                .domain([0, d3.max(matrix.flat())]);
+        // Обновление визуализации
+        function updateVisualization(sortedTags) {
+            const data = sortedTags
+                ? {tags: sortedTags, matrix: resortMatrix(currentData, sortedTags)}
+                : currentData;
 
-            // Создаем шкалы
-            const xScale = d3.scaleBand()
-                .domain(tags)
+            // Обновляем шкалы
+            xScale = d3.scaleBand()
+                .domain(data.tags)
                 .range([margin.left, width - margin.right])
                 .padding(0.05);
 
-            const yScale = d3.scaleBand()
-                .domain(tags)
+            yScale = d3.scaleBand()
+                .domain(data.tags)
                 .range([margin.top, height - margin.bottom])
                 .padding(0.05);
 
-            // Оси
-            const xAxis = d3.axisTop(xScale)
-                .tickSize(0)
-                .tickFormat(d => d.length > 15 ? d.substring(0, 12) + "..." : d);
-
-            const yAxis = d3.axisLeft(yScale)
-                .tickSize(0)
-                .tickFormat(d => d.length > 15 ? d.substring(0, 12) + "..." : d);
-
-            // Рисуем оси
-            svg.append("g")
-                .attr("class", "x axis")
+            // Обновляем оси
+            svg.select(".x.axis")
                 .attr("transform", `translate(0,${margin.top})`)
-                .call(xAxis)
+                .call(d3.axisTop(xScale).tickSize(0))
                 .selectAll("text")
                 .style("text-anchor", "start")
                 .attr("transform", "rotate(45)");
 
-            svg.append("g")
-                .attr("class", "y axis")
+            svg.select(".y.axis")
                 .attr("transform", `translate(${margin.left},0)`)
-                .call(yAxis)
+                .call(d3.axisLeft(yScale).tickSize(0))
                 .selectAll("text")
                 .style("text-anchor", "end")
                 .attr("transform", "rotate(-45)");
 
-            // Ячейки матрицы
-            svg.selectAll()
-                .data(tags)
-                .enter()
-                .selectAll()
-                .data((d, i) => tags.map((t, j) => ({x: t, y: d, value: matrix[i][j]})))
-                .enter()
+            // Обновляем ячейки
+            const cells = svg.selectAll(".cell")
+                .data(data.tags.flatMap((d, i) =>
+                    data.tags.map((t, j) => ({
+                        x: t,
+                        y: d,
+                        value: data.matrix[i][j]
+                    }))
+                ));
+
+            cells.exit().remove();
+
+            cells.enter()
                 .append("rect")
                 .attr("class", "cell")
+                .on("mouseover", showTooltip)
+                .on("mouseout", hideTooltip)
+                .merge(cells)
                 .attr("x", d => xScale(d.x))
                 .attr("y", d => yScale(d.y))
                 .attr("width", xScale.bandwidth())
                 .attr("height", yScale.bandwidth())
-                .attr("fill", d => colorScale(d.value))
-                .append("title")
-                .text(d => `${d.y} & ${d.x}\nCount: ${d.value}`);
+                .attr("fill", d => colorScale(d.value));
+        }
 
-            // Легенда
-            const legend = svg.append("g")
-                .attr("class", "legend")
-                .attr("transform", `translate(${width - 150},${margin.top})`);
+        // Функции для работы с данными
+        function resortMatrix(data, sortedTags) {
+            const indexMap = new Map(sortedTags.map((tag, i) => [tag, i]));
+            return sortedTags.map(tag1 =>
+                sortedTags.map(tag2 =>
+                    data.matrix[data.tags.indexOf(tag1)][data.tags.indexOf(tag2)]
+                )
+            );
+        }
 
-            const legendScale = d3.scaleLinear()
-                .domain(colorScale.domain())
-                .range([0, 100]);
+        function sortByFrequency(data) {
+            const frequencies = data.tags.map((tag, i) => ({
+                tag,
+                count: data.matrix[i].reduce((a, b) => a + b, 0)
+            }));
 
-            const legendAxis = d3.axisRight(legendScale)
-                .ticks(5)
-                .tickSize(6);
+            return frequencies
+                .sort((a, b) => b.count - a.count)
+                .map(d => d.tag);
+        }
 
-            legend.append("g")
-                .call(legendAxis);
+        // Обработчики событий
+        function showTooltip(event, d) {
+            const tooltip = d3.select("#tooltip");
+            tooltip
+                .html(`${d.y} ↔ ${d.x}<br>Совместных упоминаний: ${d.value}`)
+                .style("left", `${event.pageX + 10}px`)
+                .style("top", `${event.pageY + 10}px`)
+                .style("opacity", 1);
+        }
 
-            legend.selectAll("rect")
-                .data(d3.range(0, 100, 2))
-                .enter()
-                .append("rect")
-                .attr("x", 0)
-                .attr("y", d => 100 - d)
-                .attr("width", 10)
-                .attr("height", 2)
-                .attr("fill", d => colorScale(legendScale.invert(d)));
+        function hideTooltip() {
+            d3.select("#tooltip").style("opacity", 0);
+        }
+
+        // Управление масштабом
+        function zoomIn() {
+            currentTransform = currentTransform.scale(1.2);
+            svg.transition().call(zoom.transform, currentTransform);
+        }
+
+        function zoomOut() {
+            currentTransform = currentTransform.scale(0.8);
+            svg.transition().call(zoom.transform, currentTransform);
+        }
+
+        function resetZoom() {
+            currentTransform = d3.zoomIdentity;
+            svg.transition().call(zoom.transform, currentTransform);
+        }
+
+        // Обработчик сортировки
+        d3.select("#sort-select").on("change", function() {
+            if (!currentData) return;
+
+            const sortedTags = this.value === "frequency"
+                ? sortByFrequency(currentData)
+                : [...currentData.tags].sort();
+
+            updateVisualization(sortedTags);
         });
+
+        // Инициализация и загрузка данных
+        initVisualization();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const group = urlParams.get('group') || '';
+        const url = group ? `/api/coocc_matrix_d3.json?group=${encodeURIComponent(group)}` : '/api/coocc_matrix_d3.json';
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                currentData = data;
+                colorScale = d3.scaleSequential()
+                    .interpolator(d3.interpolateYlOrRd)
+                    .domain([0, d3.max(data.matrix.flat())]);
+
+                updateVisualization(sortByFrequency(data));
+            });
+    });
 </script>
 {{end}}
