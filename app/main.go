@@ -39,6 +39,7 @@ func main() {
 
 func provideApiControllers(log *slog.Logger, repo repositories.Repository) []api.ApiController {
 	return []api.ApiController{
+		api.NewGroupsApiController(log, repo),
 		api.NewCooccPairsD3ApiController(log, repo),
 	}
 }

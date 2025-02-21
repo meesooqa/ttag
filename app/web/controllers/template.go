@@ -93,7 +93,7 @@ func (t *DefaultTemplate) GetData(r *http.Request) TemplateData {
 func (t *DefaultTemplate) getGroups(group string) []GroupItem {
 	items, err := t.repo.GetUniqueValues(context.TODO(), "group")
 	if err != nil {
-		t.log.Error(err.Error(), "err", err)
+		t.log.Error("DefaultTemplate group getting", "err", err)
 		return nil
 	}
 
