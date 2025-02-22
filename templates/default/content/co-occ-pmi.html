@@ -1,1 +1,80 @@
-{{define "content"}}{{end}}
+{{define "content"}}
+<style>
+    body { font-family: Arial, sans-serif; }
+    .cell { stroke: #fff; }
+    .axis text { font-size: 8px; }
+</style>
+<svg id="heatmap" width="4000" height="4000"></svg>
+<script>
+    function buildApiUrl(base) {
+        const url = new URL(base, window.location.href);
+        const params = new URLSearchParams(window.location.search);
+        params.forEach((v, k) => url.searchParams.set(k, v));
+        return url;
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        d3.json(buildApiUrl('/api/coocc_pmi_d3.json')).then(function(data) {
+            const svg = d3.select("svg#heatmap");
+            if (!svg) return;
+
+            // Извлекаем все уникальные теги
+            const tagsSet = new Set();
+            data.pairs.forEach(pair => {
+                tagsSet.add(pair.tagA);
+                tagsSet.add(pair.tagB);
+            });
+            const tags = Array.from(tagsSet).sort();
+
+            const matrix = {};
+            tags.forEach(tag => { matrix[tag] = {}; });
+            data.pairs.forEach(pair => {
+                matrix[pair.tagA][pair.tagB] = pair.pmi;
+                matrix[pair.tagB][pair.tagA] = pair.pmi; // симметрично
+            });
+
+            const cellSize = 8;
+            const offset = 64;
+
+            const maxPMI = d3.max(data.pairs, d => d.pmi);
+            const colorScale = d3.scaleSequential(d3.interpolateBlues)
+                .domain([0, maxPMI]);
+
+            // Рисуем ячейки матрицы
+            tags.forEach((tagA, i) => {
+                tags.forEach((tagB, j) => {
+                    const value = matrix[tagA][tagB] || 0;
+                    svg.append("rect")
+                        .attr("x", i * cellSize + offset)
+                        .attr("y", j * cellSize + offset)
+                        .attr("width", cellSize)
+                        .attr("height", cellSize)
+                        .attr("fill", colorScale(value))
+                        .attr("class", "cell")
+                        .append("title")
+                        .text(`(${tagA}, ${tagB}): ${value.toFixed(2)}`);
+                });
+            });
+
+            // Добавляем подписи для осей X и Y
+            tags.forEach((tag, i) => {
+                svg.append("text")
+                    .attr("x", i * cellSize + offset + cellSize / 2)
+                    .attr("y", offset - 10)
+                    .attr("text-anchor", "middle")
+                    .attr("class", "axis")
+                    .text(tag);
+            });
+            tags.forEach((tag, j) => {
+                svg.append("text")
+                    .attr("x", offset - 10)
+                    .attr("y", j * cellSize + offset + cellSize / 2)
+                    .attr("text-anchor", "end")
+                    .attr("class", "axis")
+                    .text(tag);
+            });
+        }).catch(function(error) {
+            console.error("Ошибка загрузки данных:", error);
+        });
+    });
+</script>
+{{end}}
