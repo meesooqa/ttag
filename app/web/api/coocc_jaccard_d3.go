@@ -21,7 +21,7 @@ func NewCooccJaccardD3ApiController(log *slog.Logger, repo repositories.Reposito
 		BaseApiController: BaseApiController{
 			log:    log,
 			method: http.MethodGet,
-			route:  "/api/coocc_support_d3.json",
+			route:  "/api/coocc_jaccard_d3.json",
 		},
 		provider: analysis.NewCooccJaccardDataProvider(log, repo),
 		adapter:  adapter.NewCooccJaccardD3DataAdapter(log),
