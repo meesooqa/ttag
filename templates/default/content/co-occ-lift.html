@@ -20,12 +20,24 @@
     }
 
     .cell { stroke: #ccc; }
+
+    .node {
+        stroke: #fff;
+        stroke-width: 1.5px;
+    }
+    .label {
+        font-family: sans-serif;
+        text-anchor: middle;
+        fill: #333;
+        pointer-events: none;
+    }
 </style>
 <h3>Граф взаимосвязей тегов: метрика Lift</h3>
 <svg id="graph" width="1200" height="1200"></svg>
-
 <h3>Chord Diagram (диаграмма хорд)</h3>
 <svg id="chord" width="1200" height="1200"></svg>
+<h3>Bubble Chart (пузырьковая диаграмма)</h3>
+<svg id="bubble" width="1000" height="1000"></svg>
 
 <script>
 function buildApiUrl(base) {
@@ -39,6 +51,11 @@ document.addEventListener('DOMContentLoaded', function() {
     d3.json(buildApiUrl('/api/coocc_lift_d3.json')).then(function(data) {
         // data предполагается в формате:
         // { pairs: [{ tagA: "тег1", tagB: "тег2", lift: значение }, ...] }
+
+        const svg = d3.select("svg#graph");
+        if (!svg) {
+            return;
+        }
 
         // Создание множества узлов из пар тегов
         const nodes = {};
@@ -56,8 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }));
 
         // Настройка размеров svg
-        const svg = d3.select("svg#graph"),
-            width = +svg.attr("width"),
+        const width = +svg.attr("width"),
             height = +svg.attr("height");
 
         // Создание силовой симуляции
@@ -137,6 +153,11 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     d3.json(buildApiUrl('/api/coocc_lift_d3.json')).then(function(data) {
+        const svg = d3.select("svg#chord");
+        if (!svg) {
+            return;
+        }
+
         const tags = Array.from(new Set(data.pairs.flatMap(d => [d.tagA, d.tagB])));
         const index = new Map(tags.map((tag, i) => [tag, i]));
         const matrix = Array.from({ length: tags.length }, () => new Array(tags.length).fill(0));
@@ -146,8 +167,7 @@ document.addEventListener('DOMContentLoaded', function() {
             matrix[index.get(d.tagB)][index.get(d.tagA)] = d.lift;
         });
 
-        const svg = d3.select("svg#chord"),
-            width = +svg.attr("width"),
+        const width = +svg.attr("width"),
             height = +svg.attr("height"),
             outerRadius = Math.min(width, height) * 0.4,
             innerRadius = outerRadius - 30;
@@ -179,6 +199,50 @@ document.addEventListener('DOMContentLoaded', function() {
             .attr("transform", d => `rotate(${(d.startAngle + d.endAngle) / 2 * 180 / Math.PI - 90}) translate(${outerRadius + 10})`)
             .text(d => tags[d.index])
             .style("font-size", "12px");
+    });
+
+    d3.json(buildApiUrl('/api/coocc_lift_d3.json')).then(function(data) {
+        const svg = d3.select("svg#bubble");
+        if (!svg) {
+            return;
+        }
+
+        const nodes = Object.entries(data.tagFreq).map(([tag, frequency]) => ({
+            id: tag,
+            frequency: frequency
+        }));
+
+        const width = +svg.attr("width"),
+            height = +svg.attr("height");
+
+        // Преобразуем данные в иерархическую структуру.
+        const root = d3.hierarchy({ children: nodes })
+            .sum(d => d.frequency)
+            .sort((a, b) => b.value - a.value);
+
+        const pack = d3.pack()
+            .size([width, height])
+            .padding(5);
+
+        pack(root);
+
+        const node = svg.selectAll("g")
+            .data(root.leaves())
+            .enter().append("g")
+            .attr("transform", d => `translate(${d.x},${d.y})`);
+
+        node.append("circle")
+            .attr("class", "node")
+            .attr("r", d => d.r)
+            .attr("fill", d => d3.schemeCategory10[d.data.id.charCodeAt(0) % 10]);
+
+        node.append("text")
+            .attr("class", "label")
+            .attr("dy", "0.3em")
+            .text(d => d.data.id)
+            .style("font-size", d => Math.min(2 * d.r, (2 * d.r - 8) / d.data.id.length) + "px");
+    }).catch(function(error) {
+        console.error("Ошибка загрузки данных:", error);
     });
 });
 </script>

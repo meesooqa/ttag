@@ -18,7 +18,8 @@ type CooccLiftDataProvider struct {
 
 // CooccLiftData содержит срез пар тегов с их Lift-метрикой.
 type CooccLiftData struct {
-	Pairs []TagPairLift `json:"pairs"`
+	Pairs   []TagPairLift  `json:"pairs"`
+	TagFreq map[string]int `json:"tagFreq"`
 }
 
 // TagPairLift содержит пару тегов и рассчитанное значение Lift.
@@ -47,28 +48,30 @@ func (p *CooccLiftDataProvider) GetData(ctx context.Context, group string) Analy
 
 	totalMessages := len(messages)
 	if totalMessages == 0 {
-		return &CooccLiftData{Pairs: []TagPairLift{}}
+		return &CooccLiftData{
+			Pairs:   []TagPairLift{},
+			TagFreq: map[string]int{},
+		}
 	}
 
-	// Подсчёт индивидуальных появлений тегов и совместных появлений пар тегов
+	// Подсчет частот для каждого тега и совместных появлений для пар тегов.
 	tagFreq := make(map[string]int)
 	pairFreq := make(map[string]int)
 
 	for _, msg := range messages {
-		// Используем множество, чтобы посчитать каждый тег только один раз для данного сообщения
+		// Для каждого сообщения создаем множество уникальных тегов.
 		tagSet := make(map[string]struct{})
 		for _, tag := range msg.Tags {
 			tagSet[tag] = struct{}{}
 		}
 
-		// Подсчёт появления каждого тега
 		var tags []string
 		for tag := range tagSet {
-			tagFreq[tag]++
+			tagFreq[tag]++ // Увеличиваем частоту для тега (учитываем только уникальное появление в сообщении)
 			tags = append(tags, tag)
 		}
 
-		// Сортируем теги, чтобы пары имели единый порядок (A|B, а не B|A)
+		// Сортировка тегов для единообразного формирования ключа пары.
 		sort.Strings(tags)
 		for i := 0; i < len(tags); i++ {
 			for j := i + 1; j < len(tags); j++ {
@@ -78,8 +81,8 @@ func (p *CooccLiftDataProvider) GetData(ctx context.Context, group string) Analy
 		}
 	}
 
-	// Вычисление Lift для каждой пары
-	var result []TagPairLift
+	// Вычисление Lift для каждой пары.
+	var pairs []TagPairLift
 	for key, fAB := range pairFreq {
 		parts := strings.Split(key, "|")
 		if len(parts) != 2 {
@@ -95,7 +98,7 @@ func (p *CooccLiftDataProvider) GetData(ctx context.Context, group string) Analy
 			continue
 		}
 		lift := (float64(fAB) * float64(totalMessages)) / (float64(fA) * float64(fB))
-		result = append(result, TagPairLift{
+		pairs = append(pairs, TagPairLift{
 			TagA: tagA,
 			TagB: tagB,
 			Lift: lift,
@@ -103,6 +106,7 @@ func (p *CooccLiftDataProvider) GetData(ctx context.Context, group string) Analy
 	}
 
 	return &CooccLiftData{
-		Pairs: result,
+		Pairs:   pairs,
+		TagFreq: tagFreq,
 	}
 }
