@@ -25,6 +25,7 @@ func NewCooccController(log *slog.Logger, tpl Template) *CooccController {
 		NewCooccMatrixController(log, tpl),
 		//NewCooccLiftController(log, tpl),
 		NewCooccLiftGraphController(log, tpl),
+		NewCooccLiftChordController(log, tpl),
 		NewCooccAmController(log, tpl),
 	)
 	return c
