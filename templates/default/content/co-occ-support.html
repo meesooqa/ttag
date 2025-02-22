@@ -1,0 +1,189 @@
+{{define "content"}}
+<style>
+    .cell {
+        stroke: #ccc;
+    }
+    .label {
+        font-size: 12px;
+        fill: #333;
+    }
+</style>
+<!--<h3>Тепловая карта поддержки (Support)</h3>-->
+<!--<svg id="heatmap" width="2000" height="2000"></svg>-->
+<h3>Сетевой граф для Support (Force-Directed Graph)</h3>
+<svg id="fdgraph" width="1000" height="1000"></svg>
+<script>
+    function buildApiUrl(base) {
+        const url = new URL(base, window.location.href);
+        const params = new URLSearchParams(window.location.search);
+        params.forEach((v, k) => url.searchParams.set(k, v));
+        return url;
+    }
+document.addEventListener('DOMContentLoaded', function() {
+    d3.json(buildApiUrl('/api/coocc_support_d3.json')).then(function(data) {
+        const svg = d3.select("svg#heatmap");
+        if (!svg) {
+            return;
+        }
+
+        // Извлекаем список уникальных тегов
+        const tags = Array.from(new Set(data.pairs.flatMap(d => [d.tagA, d.tagB]))).sort();
+
+        // Создаем объект-матрицу для хранения значений support
+        const matrix = {};
+        tags.forEach(tag => matrix[tag] = {});
+        data.pairs.forEach(d => {
+            matrix[d.tagA][d.tagB] = d.support;
+            matrix[d.tagB][d.tagA] = d.support; // симметрично
+        });
+
+        // const cellSize = 20;
+        // const offset = 100;
+        const cellSize = 10;
+        const offset = 50;
+
+        // Определяем шкалу цвета для значений support от 0 до максимального (обычно не более 1)
+        const maxSupport = d3.max(data.pairs, d => d.support);
+        const colorScale = d3.scaleSequential(d3.interpolateBlues)
+            .domain([0, maxSupport]);
+
+        // Рисуем ячейки матрицы
+        tags.forEach((tagA, i) => {
+            tags.forEach((tagB, j) => {
+                const value = matrix[tagA][tagB] || 0;
+                svg.append("rect")
+                    .attr("x", i * cellSize + offset)
+                    .attr("y", j * cellSize + offset)
+                    .attr("width", cellSize)
+                    .attr("height", cellSize)
+                    .attr("fill", colorScale(value))
+                    .attr("class", "cell")
+                    .append("title")
+                    .text(`(${tagA}, ${tagB}): ${value.toFixed(2)}`);
+            });
+        });
+
+        // Подписи для осей Y (слева)
+        tags.forEach((tag, j) => {
+            svg.append("text")
+                .attr("x", offset - 10)
+                .attr("y", j * cellSize + offset + cellSize / 2)
+                .attr("dy", ".35em")
+                .attr("text-anchor", "end")
+                .attr("class", "label")
+                .text(tag);
+        });
+
+        // Подписи для осей X (сверху)
+        tags.forEach((tag, i) => {
+            svg.append("text")
+                .attr("x", i * cellSize + offset + cellSize / 2)
+                .attr("y", offset - 10)
+                .attr("dy", ".35em")
+                .attr("text-anchor", "middle")
+                .attr("class", "label")
+                .text(tag);
+        });
+    }).catch(function(error) {
+        console.error("Ошибка загрузки данных:", error);
+    });
+
+    d3.json(buildApiUrl('/api/coocc_support_d3.json')).then(function(data) {
+        const svg = d3.select("svg#fdgraph");
+        if (!svg) {
+            return;
+        }
+
+        // Формирование списка уникальных тегов
+        const nodes = {};
+        data.pairs.forEach(pair => {
+            nodes[pair.tagA] = { id: pair.tagA };
+            nodes[pair.tagB] = { id: pair.tagB };
+        });
+        const nodesArray = Object.values(nodes);
+
+        // Формирование массива связей с использованием support
+        const linksArray = data.pairs.map(pair => ({
+            source: pair.tagA,
+            target: pair.tagB,
+            support: pair.support
+        }));
+
+        const width = +svg.attr("width"),
+            height = +svg.attr("height");
+
+        // Создаем силовую симуляцию
+        const simulation = d3.forceSimulation(nodesArray)
+            .force("link", d3.forceLink(linksArray).id(d => d.id).distance(150))
+            .force("charge", d3.forceManyBody().strength(-200))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        // Отрисовка связей
+        const link = svg.append("g")
+            .attr("class", "links")
+            .selectAll("line")
+            .data(linksArray)
+            .enter().append("line")
+            .attr("class", "link")
+            .style("stroke-width", d => d.support * 10); // Настройте коэффициент по необходимости
+
+        // Отрисовка узлов
+        const node = svg.append("g")
+            .attr("class", "nodes")
+            .selectAll("circle")
+            .data(nodesArray)
+            .enter().append("circle")
+            .attr("class", "node")
+            .attr("r", 8)
+            .attr("fill", d => d3.schemeCategory10[d.id.charCodeAt(0) % 10])
+            .call(drag(simulation));
+
+        // Подписи для узлов
+        const label = svg.append("g")
+            .attr("class", "labels")
+            .selectAll("text")
+            .data(nodesArray)
+            .enter().append("text")
+            .attr("dy", -10)
+            .text(d => d.id);
+
+        simulation.on("tick", () => {
+            link.attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node.attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+
+            label.attr("x", d => d.x)
+                .attr("y", d => d.y);
+        });
+
+        // Функция для перетаскивания узлов
+        function drag(simulation) {
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+        }
+    }).catch(function(error) {
+        console.error("Ошибка загрузки данных:", error);
+    });
+});
+</script>
+{{end}}

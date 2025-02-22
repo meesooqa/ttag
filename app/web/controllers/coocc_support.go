@@ -9,6 +9,7 @@ type CooccSupportController struct {
 	BaseController
 }
 
+// Тепловая карта поддержки (Support)
 func NewCooccSupportController(log *slog.Logger, tpl Template) *CooccSupportController {
 	c := &CooccSupportController{BaseController{
 		log:        log,
@@ -16,7 +17,7 @@ func NewCooccSupportController(log *slog.Logger, tpl Template) *CooccSupportCont
 		method:     http.MethodGet,
 		route:      "/co-occ/support/",
 		title:      "Support Measure",
-		contentTpl: "content/co-occ-lift-support.html",
+		contentTpl: "content/co-occ-support.html",
 	}}
 	c.self = c
 	return c
