@@ -36,6 +36,9 @@ func NewCooccLiftDataProvider(log *slog.Logger, repo repositories.Repository) *C
 	}
 }
 
+// Меры ассоциации: Lift
+// Lift: Отношение наблюдаемой совместной частоты к ожидаемой при независимости появления тегов.
+// Lift: отношение совместной вероятности появления тегов к произведению их индивидуальных вероятностей.
 func (p *CooccLiftDataProvider) GetData(ctx context.Context, group string) AnalyzedData {
 	filter := bson.M{}
 	if group != "" {
