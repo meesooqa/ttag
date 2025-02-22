@@ -47,6 +47,7 @@ func provideApiControllers(log *slog.Logger, repo repositories.Repository) []api
 		api.NewCooccLiftD3ApiController(log, repo),
 		api.NewCooccSupportD3ApiController(log, repo),
 		api.NewCooccJaccardD3ApiController(log, repo),
+		api.NewCooccPmiD3ApiController(log, repo),
 	}
 }
 
