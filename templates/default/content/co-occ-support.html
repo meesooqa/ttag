@@ -1,17 +1,21 @@
 {{define "content"}}
 <style>
-    .cell {
-        stroke: #ccc;
-    }
-    .label {
-        font-size: 12px;
-        fill: #333;
-    }
+    .cell {stroke: #ccc;}
+    .label { font-size: 12px; fill: #333; }
+
+    /*.node { stroke: #fff; stroke-width: 1.5px; }*/
+    /*.link { stroke: #999; stroke-opacity: 0.6; }*/
+
+    .link { fill: none; stroke: steelblue; stroke-opacity: 0.6; }
+    .node { fill: #ff8c00; }
+
 </style>
 <!--<h3>Тепловая карта поддержки (Support)</h3>-->
 <!--<svg id="heatmap" width="2000" height="2000"></svg>-->
-<h3>Сетевой граф для Support (Force-Directed Graph)</h3>
-<svg id="fdgraph" width="1000" height="1000"></svg>
+<!--<h3>Сетевой граф для Support (Force-Directed Graph)</h3>-->
+<!--<svg id="fdgraph" width="1000" height="1000"></svg>-->
+<h3>Arc Diagram для Support</h3>
+<svg id="arc" width="8000" height="2000"></svg>
 <script>
     function buildApiUrl(base) {
         const url = new URL(base, window.location.href);
@@ -181,6 +185,63 @@ document.addEventListener('DOMContentLoaded', function() {
                 .on("drag", dragged)
                 .on("end", dragended);
         }
+    }).catch(function(error) {
+        console.error("Ошибка загрузки данных:", error);
+    });
+
+    d3.json(buildApiUrl('/api/coocc_support_d3.json')).then(function(data) {
+        const svg = d3.select("svg#arc");
+        if (!svg) {
+            return;
+        }
+
+        // Извлечение уникальных тегов и сортировка
+        const tags = Array.from(new Set(data.pairs.flatMap(d => [d.tagA, d.tagB]))).sort();
+        const width = +svg.attr("width");
+        const margin = {left: 50, right: 50};
+
+        // Создаем шкалу для расположения тегов вдоль горизонтальной оси
+        const xScale = d3.scalePoint()
+            .domain(tags)
+            .range([margin.left, width - margin.right]);
+
+        // Отрисовка узлов (кругов) вдоль базовой линии
+        svg.selectAll("circle")
+            .data(tags)
+            .enter().append("circle")
+            .attr("cx", d => xScale(d))
+            .attr("cy", 150)
+            .attr("r", 5)
+            .attr("class", "node");
+
+        // Подписи для тегов
+        svg.selectAll("text")
+            .data(tags)
+            .enter().append("text")
+            .attr("x", d => xScale(d))
+            .attr("y", 170)
+            .attr("text-anchor", "middle")
+            .attr("class", "label")
+            .text(d => d);
+
+        // Отрисовка дуг для каждой пары тегов
+        data.pairs.forEach(pair => {
+            const x1 = xScale(pair.tagA);
+            const x2 = xScale(pair.tagB);
+            const support = pair.support;
+            const arcPath = d3.path();
+            // Рассчитываем радиус дуги в зависимости от расстояния между тегами
+            const dx = x2 - x1;
+            const dr = Math.abs(dx) / 2;
+            arcPath.moveTo(x1, 150);
+            arcPath.arcTo((x1 + x2) / 2, 150 - dr, x2, 150, dr);
+            svg.append("path")
+                .attr("d", arcPath.toString())
+                .attr("class", "link")
+                .style("stroke-width", support * 10) // Коэффициент для наглядности
+                .append("title")
+                .text(`${pair.tagA} - ${pair.tagB}: ${support.toFixed(2)}`);
+        });
     }).catch(function(error) {
         console.error("Ошибка загрузки данных:", error);
     });
