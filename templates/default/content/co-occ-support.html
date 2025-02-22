@@ -3,19 +3,32 @@
     .cell {stroke: #ccc;}
     .label { font-size: 12px; fill: #333; }
 
+    /*fdgraph*/
     /*.node { stroke: #fff; stroke-width: 1.5px; }*/
     /*.link { stroke: #999; stroke-opacity: 0.6; }*/
 
+    /*Arc*/
     .link { fill: none; stroke: steelblue; stroke-opacity: 0.6; }
     .node { fill: #ff8c00; }
+
+    /*Scat*/
+    .axis path,
+    .axis line {
+        fill: none;
+        stroke: #000;
+        shape-rendering: crispEdges;
+    }
+    .bubble {opacity: 0.7;}
 
 </style>
 <!--<h3>Тепловая карта поддержки (Support)</h3>-->
 <!--<svg id="heatmap" width="2000" height="2000"></svg>-->
 <!--<h3>Сетевой граф для Support (Force-Directed Graph)</h3>-->
 <!--<svg id="fdgraph" width="1000" height="1000"></svg>-->
-<h3>Arc Diagram для Support</h3>
-<svg id="arc" width="8000" height="2000"></svg>
+<!--<h3>Arc Diagram для Support</h3>-->
+<!--<svg id="arc" width="8000" height="2000"></svg>-->
+<h3>Scatter Plot / Bubble Matrix для Support</h3>
+<svg id="scat" width="10000" height="10000"></svg>
 <script>
     function buildApiUrl(base) {
         const url = new URL(base, window.location.href);
@@ -242,6 +255,125 @@ document.addEventListener('DOMContentLoaded', function() {
                 .append("title")
                 .text(`${pair.tagA} - ${pair.tagB}: ${support.toFixed(2)}`);
         });
+    }).catch(function(error) {
+        console.error("Ошибка загрузки данных:", error);
+    });
+
+    d3.json(buildApiUrl('/api/coocc_support_d3.json')).then(function(data) {
+        const svg = d3.select("svg#scat");
+        if (!svg) {
+            return;
+        }
+
+        // Предполагаемая структура данных:
+        // data = {
+        //   pairs: [
+        //     { tagA: "тег1", tagB: "тег2", support: 0.15 },
+        //     { tagA: "тег1", tagB: "тег3", support: 0.10 },
+        //     ...
+        //   ],
+        //   tagFreq: {
+        //     "тег1": 10,
+        //     "тег2": 7,
+        //     "тег3": 5,
+        //     ...
+        //   }
+        // }
+
+        const pairs = data.pairs;
+        const tagFreq = data.tagFreq;
+
+        // Для каждой пары вычисляем координаты: x - частота tagA, y - частота tagB.
+        // Bubble size (и цвет) зависят от значения support.
+        const points = pairs.map(d => ({
+            tagA: d.tagA,
+            tagB: d.tagB,
+            x: tagFreq[d.tagA] || 0,
+            y: tagFreq[d.tagB] || 0,
+            support: d.support
+        }));
+
+        // Размеры графика
+        const margin = {top: 50, right: 50, bottom: 50, left: 50},
+            width = +svg.attr("width") - margin.left - margin.right,
+            height = +svg.attr("height") - margin.top - margin.bottom;
+
+        const g = svg.append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Определим шкалы для осей по частотам тегов
+        const freqValues = Object.values(tagFreq);
+        const xExtent = d3.extent(freqValues);
+        const yExtent = d3.extent(freqValues);
+
+        // Немного расширим диапазон
+        const xScale = d3.scaleLinear()
+            .domain([0, xExtent[1] * 1.1])
+            .range([0, width]);
+        const yScale = d3.scaleLinear()
+            .domain([0, yExtent[1] * 1.1])
+            .range([height, 0]);
+
+        // Создаем оси
+        const xAxis = d3.axisBottom(xScale);
+        const yAxis = d3.axisLeft(yScale);
+
+        g.append("g")
+            .attr("transform", `translate(0, ${height})`)
+            .attr("class", "axis")
+            .call(xAxis);
+        g.append("g")
+            .attr("class", "axis")
+            .call(yAxis);
+
+        // Шкала для размера пузырьков по support
+        const supportExtent = d3.extent(points, d => d.support);
+        const rScale = d3.scaleSqrt()
+            .domain(supportExtent)
+            .range([5, 30]);
+
+        // Шкала для цвета (чем выше support – насыщеннее цвет)
+        const colorScale = d3.scaleSequential(d3.interpolateReds)
+            .domain(supportExtent);
+
+        // Отрисовка пузырьков
+        const bubbles = g.selectAll(".bubble")
+            .data(points)
+            .enter().append("circle")
+            .attr("class", "bubble")
+            .attr("cx", d => xScale(d.x))
+            .attr("cy", d => yScale(d.y))
+            .attr("r", d => rScale(d.support))
+            .attr("fill", d => colorScale(d.support))
+            .attr("stroke", "#333")
+            .attr("stroke-width", 1)
+            .append("title")
+            .text(d => `${d.tagA} & ${d.tagB}\nSupport: ${d.support.toFixed(2)}\nFreq: (${d.x}, ${d.y})`);
+
+        // Дополнительно можно добавить подписи для пузырьков
+        g.selectAll(".label")
+            .data(points)
+            .enter().append("text")
+            .attr("class", "label")
+            .attr("x", d => xScale(d.x))
+            .attr("y", d => yScale(d.y))
+            .attr("dy", ".35em")
+            .attr("text-anchor", "middle")
+            .text(d => `${d.tagA}-${d.tagB}`);
+
+        // Добавление подписей для осей
+        svg.append("text")
+            .attr("x", margin.left + width / 2)
+            .attr("y", +svg.attr("height") - 10)
+            .attr("text-anchor", "middle")
+            .text("Частота появления tagA");
+
+        svg.append("text")
+            .attr("x", 15)
+            .attr("y", margin.top + height / 2)
+            .attr("transform", `rotate(-90,15,${margin.top + height / 2})`)
+            .attr("text-anchor", "middle")
+            .text("Частота появления tagB");
     }).catch(function(error) {
         console.error("Ошибка загрузки данных:", error);
     });

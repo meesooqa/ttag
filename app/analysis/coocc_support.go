@@ -17,7 +17,8 @@ type CooccSupportDataProvider struct {
 }
 
 type CooccSupportData struct {
-	Pairs []TagPairSupport `json:"pairs"`
+	Pairs   []TagPairSupport `json:"pairs"`
+	TagFreq map[string]int   `json:"tagFreq"`
 }
 
 type TagPairSupport struct {
@@ -54,6 +55,7 @@ func (p *CooccSupportDataProvider) GetData(ctx context.Context, group string) An
 	}
 
 	// Подсчет совместного появления тегов.
+	tagFreq := make(map[string]int)
 	pairFreq := make(map[string]int)
 	for _, msg := range messages {
 		// Создаем множество уникальных тегов для каждого сообщения.
@@ -64,6 +66,7 @@ func (p *CooccSupportDataProvider) GetData(ctx context.Context, group string) An
 
 		var tags []string
 		for tag := range tagSet {
+			tagFreq[tag]++ // Увеличиваем частоту для тега (учитываем только уникальное появление в сообщении)
 			tags = append(tags, tag)
 		}
 		// Сортировка тегов для единообразного формирования ключа пары.
@@ -92,6 +95,7 @@ func (p *CooccSupportDataProvider) GetData(ctx context.Context, group string) An
 	}
 
 	return &CooccSupportData{
-		Pairs: supportPairs,
+		Pairs:   supportPairs,
+		TagFreq: tagFreq,
 	}
 }
