@@ -18,9 +18,23 @@
         font-size: 12px;
         fill: #333;
     }
+
+    .cell { stroke: #ccc; }
 </style>
-<svg width="1200" height="1200"></svg>
+<h3>Граф взаимосвязей тегов: метрика Lift</h3>
+<svg id="graph" width="1200" height="1200"></svg>
+
+<h3>Chord Diagram (диаграмма хорд)</h3>
+<svg id="chord" width="1200" height="1200"></svg>
+
 <script>
+function buildApiUrl(base) {
+    const url = new URL(base, window.location.href);
+    const params = new URLSearchParams(window.location.search);
+    params.forEach((v, k) => url.searchParams.set(k, v));
+    return url;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     d3.json(buildApiUrl('/api/coocc_lift_d3.json')).then(function(data) {
         // data предполагается в формате:
@@ -42,7 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }));
 
         // Настройка размеров svg
-        const svg = d3.select("svg"),
+        const svg = d3.select("svg#graph"),
             width = +svg.attr("width"),
             height = +svg.attr("height");
 
@@ -122,22 +136,50 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error("Ошибка загрузки данных:", error);
     });
 
-    function buildApiUrl(base) {
-        const url = new URL(base, window.location.href);
-        const params = new URLSearchParams(window.location.search);
-        params.forEach((v, k) => url.searchParams.set(k, v));
-        return url;
-        // const url = new URL(base, window.location.origin);
-        // const group = new URLSearchParams(window.location.search).get('group');
-        // if (group) {
-        //     url.searchParams.set('group', group);
-        // }
-        // const minFrequency = document.getElementById('min-frequency').value;
-        // if (minFrequency > 0) {
-        //     url.searchParams.set('min_frequency', minFrequency);
-        // }
-        // return url;
-    }
+    d3.json(buildApiUrl('/api/coocc_lift_d3.json')).then(function(data) {
+        const tags = Array.from(new Set(data.pairs.flatMap(d => [d.tagA, d.tagB])));
+        const index = new Map(tags.map((tag, i) => [tag, i]));
+        const matrix = Array.from({ length: tags.length }, () => new Array(tags.length).fill(0));
+
+        data.pairs.forEach(d => {
+            matrix[index.get(d.tagA)][index.get(d.tagB)] = d.lift;
+            matrix[index.get(d.tagB)][index.get(d.tagA)] = d.lift;
+        });
+
+        const svg = d3.select("svg#chord"),
+            width = +svg.attr("width"),
+            height = +svg.attr("height"),
+            outerRadius = Math.min(width, height) * 0.4,
+            innerRadius = outerRadius - 30;
+
+        const chord = d3.chord().padAngle(0.05)(matrix);
+        const arc = d3.arc().innerRadius(innerRadius).outerRadius(outerRadius);
+        const ribbon = d3.ribbon().radius(innerRadius);
+
+        const g = svg.append("g").attr("transform", `translate(${width / 2},${height / 2})`);
+
+        g.append("g").selectAll("path")
+            .data(chord.groups)
+            .enter().append("path")
+            .attr("fill", d => d3.schemeCategory10[d.index % 10])
+            .attr("stroke", "#000")
+            .attr("d", arc);
+
+        g.append("g").selectAll("path")
+            .data(chord)
+            .enter().append("path")
+            .attr("d", ribbon)
+            .attr("fill", d => d3.schemeCategory10[d.target.index % 10])
+            .attr("stroke", "#000");
+
+        g.append("g").selectAll("text")
+            .data(chord.groups)
+            .enter().append("text")
+            .attr("dy", ".35em")
+            .attr("transform", d => `rotate(${(d.startAngle + d.endAngle) / 2 * 180 / Math.PI - 90}) translate(${outerRadius + 10})`)
+            .text(d => tags[d.index])
+            .style("font-size", "12px");
+    });
 });
 </script>
 {{end}}
