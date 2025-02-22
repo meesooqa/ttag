@@ -12,13 +12,14 @@ type CooccLiftController struct {
 // Меры ассоциации: Lift
 // Lift: Отношение наблюдаемой совместной частоты к ожидаемой при независимости появления тегов.
 // Lift: отношение совместной вероятности появления тегов к произведению их индивидуальных вероятностей.
+// Граф взаимосвязей тегов (метрика Lift)
 func NewCooccLiftController(log *slog.Logger, tpl Template) *CooccLiftController {
 	c := &CooccLiftController{BaseController{
 		log:        log,
 		tpl:        tpl,
 		method:     http.MethodGet,
 		route:      "/co-occ/lift/",
-		title:      "Lift",
+		title:      "Lift Measure",
 		contentTpl: "content/co-occ-lift.html",
 	}}
 	c.self = c

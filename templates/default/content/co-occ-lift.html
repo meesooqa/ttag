@@ -1,3 +1,143 @@
 {{define "content"}}
-Lift
+<style>
+    body {
+        font-family: Arial, sans-serif;
+    }
+    svg {
+        border: 1px solid #ccc;
+    }
+    .node {
+        stroke: #fff;
+        stroke-width: 1.5px;
+    }
+    .link {
+        stroke: #999;
+        stroke-opacity: 0.6;
+    }
+    .labels {
+        font-size: 12px;
+        fill: #333;
+    }
+</style>
+<svg width="1200" height="1200"></svg>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    d3.json(buildApiUrl('/api/coocc_lift_d3.json')).then(function(data) {
+        // data предполагается в формате:
+        // { pairs: [{ tagA: "тег1", tagB: "тег2", lift: значение }, ...] }
+
+        // Создание множества узлов из пар тегов
+        const nodes = {};
+        data.pairs.forEach(pair => {
+            nodes[pair.tagA] = { id: pair.tagA };
+            nodes[pair.tagB] = { id: pair.tagB };
+        });
+        const nodesArray = Object.values(nodes);
+
+        // Формирование массива связей
+        const linksArray = data.pairs.map(pair => ({
+            source: pair.tagA,
+            target: pair.tagB,
+            lift: pair.lift
+        }));
+
+        // Настройка размеров svg
+        const svg = d3.select("svg"),
+            width = +svg.attr("width"),
+            height = +svg.attr("height");
+
+        // Создание силовой симуляции
+        const simulation = d3.forceSimulation(nodesArray)
+            .force("link", d3.forceLink(linksArray).id(d => d.id).distance(d => 200 / d.lift))
+            .force("charge", d3.forceManyBody().strength(-200))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        // Отрисовка связей
+        const link = svg.append("g")
+            .attr("class", "links")
+            .selectAll("line")
+            .data(linksArray)
+            .enter().append("line")
+            .attr("class", "link")
+            .style("stroke-width", d => Math.sqrt(d.lift));
+
+        // Отрисовка узлов
+        const node = svg.append("g")
+            .attr("class", "nodes")
+            .selectAll("circle")
+            .data(nodesArray)
+            .enter().append("circle")
+            .attr("class", "node")
+            .attr("r", 8)
+            .call(drag(simulation));
+
+        // Добавление подписей к узлам
+        const label = svg.append("g")
+            .attr("class", "labels")
+            .selectAll("text")
+            .data(nodesArray)
+            .enter().append("text")
+            .attr("dy", -10)
+            .text(d => d.id);
+
+        // Обновление позиций при каждом тике симуляции
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+
+            label
+                .attr("x", d => d.x)
+                .attr("y", d => d.y);
+        });
+
+        // Функции для реализации перетаскивания узлов
+        function drag(simulation) {
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+            return d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended);
+        }
+    }).catch(function(error) {
+        console.error("Ошибка загрузки данных:", error);
+    });
+
+    function buildApiUrl(base) {
+        const url = new URL(base, window.location.href);
+        const params = new URLSearchParams(window.location.search);
+        params.forEach((v, k) => url.searchParams.set(k, v));
+        return url;
+        // const url = new URL(base, window.location.origin);
+        // const group = new URLSearchParams(window.location.search).get('group');
+        // if (group) {
+        //     url.searchParams.set('group', group);
+        // }
+        // const minFrequency = document.getElementById('min-frequency').value;
+        // if (minFrequency > 0) {
+        //     url.searchParams.set('min_frequency', minFrequency);
+        // }
+        // return url;
+    }
+});
+</script>
 {{end}}
