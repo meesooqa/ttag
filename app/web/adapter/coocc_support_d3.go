@@ -19,7 +19,7 @@ func NewCooccSupportD3DataAdapter(log *slog.Logger) *CooccSupportD3DataAdapter {
 func (a *CooccSupportD3DataAdapter) PrepareData(analyzedData analysis.AnalyzedData) any {
 	data, ok := analyzedData.(*analysis.CooccSupportData)
 	if !ok {
-		a.log.Error("invalid CooccSupportData data")
+		a.log.Error("invalid CooccSupport data")
 		return nil
 	}
 	return data
