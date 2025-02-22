@@ -23,7 +23,8 @@ func NewCooccController(log *slog.Logger, tpl Template) *CooccController {
 		NewCooccPairsController(log, tpl),
 		NewCooccClustersController(log, tpl),
 		NewCooccMatrixController(log, tpl),
-		NewCooccLiftController(log, tpl),
+		//NewCooccLiftController(log, tpl),
+		NewCooccLiftGraphController(log, tpl),
 		NewCooccAmController(log, tpl),
 	)
 	return c
