@@ -10,7 +10,8 @@ import (
 )
 
 type Repository interface {
+	Find(ctx context.Context, filter bson.M, opts ...*options.FindOptions) ([]*model.Message, error)
 	UpsertMany(messagesChan <-chan model.Message)
 	GetUniqueValues(ctx context.Context, fieldName string) ([]string, error)
-	Find(ctx context.Context, filter bson.M, opts ...*options.FindOptions) ([]*model.Message, error)
+	GetTags(ctx context.Context, query string) ([]string, error)
 }

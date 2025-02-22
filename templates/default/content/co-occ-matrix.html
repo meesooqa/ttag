@@ -1,65 +1,168 @@
 {{define "content"}}
 <style>
     .heatmap-container {
-        margin: 50px;
+        margin: 2rem;
         overflow: auto;
+        position: relative;
+        border: 1px solid #eee;
+        border-radius: 8px;
     }
 
     .cell {
         stroke: #fff;
+        transition: fill 0.2s, stroke-width 0.2s;
+    }
+
+    .controls {
+        margin: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+
+    .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .axis {
+        pointer-events: none;
     }
 
     .axis text {
-        font: 10px sans-serif;
+        font: 16px Arial, sans-serif;
+        fill: #555;
+        transition: opacity 0.3s;
     }
 
     .axis path,
     .axis line {
-        fill: none;
-        stroke: #000;
+        stroke: #ddd;
         shape-rendering: crispEdges;
     }
 
-    .legend text {
-        font: 9px sans-serif;
-    }
-    /* Добавляем стили для тултипа */
     .tooltip {
         position: absolute;
-        padding: 8px;
-        background: rgba(0, 0, 0, 0.8);
+        padding: 12px;
+        background: rgba(30, 30, 30, 0.95);
         color: #fff;
-        border-radius: 4px;
+        border-radius: 6px;
         pointer-events: none;
-        font: 12px sans-serif;
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        transition: opacity 0.2s;
+        max-width: 300px;
+        z-index: 1000;
     }
-    /* Стили для управления */
-    .controls {
-        margin: 20px;
-        padding: 10px;
-        background: #f5f5f5;
-        border-radius: 4px;
+
+    .highlighted {
+        stroke: #000 !important;
+        stroke-width: 2px !important;
+        filter: brightness(1.2);
     }
-    .zoom-buttons button {
-        margin: 0 5px;
-        padding: 5px 10px;
+
+    .cluster-border {
+        stroke: #555;
+        stroke-dasharray: 4,4;
+        stroke-width: 1.5;
+        fill: none;
+    }
+
+    #search-results {
+        position: absolute;
+        background: white;
+        border: 1px solid #ddd;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        width: calc(100% - 2px);
+    }
+
+    .search-result {
+        padding: 8px;
         cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .search-result:hover {
+        background: #f5f5f5;
+    }
+
+    .zoom-controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .btn-zoom {
+        padding: 6px 12px;
+        border-radius: 4px;
+        border: 1px solid #ced4da;
+        background: #fff;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .btn-zoom:hover {
+        background: #e9ecef;
     }
 </style>
+
 <div class="controls">
-    <div class="sort-control">
-        <label>Сортировка:</label>
-        <select id="sort-select">
-            <option value="frequency">По частоте</option>
-            <option value="alphabetical">По алфавиту</option>
-        </select>
-    </div>
-    <div class="zoom-buttons">
-        <button onclick="zoomIn()">+ Увеличить</button>
-        <button onclick="zoomOut()">- Уменьшить</button>
-        <button onclick="resetZoom()">Сброс</button>
-    </div>
+    <fieldset class="control-group">
+        <legend>Управление визуализацией</legend>
+        <div class="control-group">
+            <label>Сортировка:</label>
+            <select id="sort-select" class="form-control">
+                <option value="frequency">По частоте</option>
+                <option value="alphabetical">По алфавиту</option>
+            </select>
+        </div>
+
+        <div class="control-group">
+            <label>Кластеризация:</label>
+            <select id="cluster-method" class="form-control">
+                <option value="none">Нет</option>
+                <option value="hierarchical">Иерархическая</option>
+            </select>
+        </div>
+    </fieldset>
+
+    <fieldset class="control-group">
+        <legend>Масштаб</legend>
+        <div class="zoom-buttons">
+            <button class="btn-zoom" aria-label="Увеличить">+</button>
+            <button class="btn-zoom" aria-label="Уменьшить">−</button>
+            <button class="btn-reset">Сброс</button>
+        </div>
+    </fieldset>
+
+    <fieldset class="control-group">
+        <legend>Фильтры</legend>
+        <div class="control-group">
+            <label>Минимальная частота:</label>
+            <div class="input-group">
+                <input type="number" id="min-frequency" min="0" value="0" class="form-control">
+                <button class="btn-apply">Применить</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <label>Поиск тегов:</label>
+            <input type="search" id="tag-search" class="form-control" placeholder="Введите тег...">
+            <div id="search-results"></div>
+        </div>
+    </fieldset>
 </div>
+
 <div class="heatmap-container">
     <div id="heatmap"></div>
 </div>
@@ -67,167 +170,461 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        let currentData = null;
-        let currentTransform = d3.zoomIdentity;
-        let svg, xScale, yScale, colorScale;
-        const width = 4000;
-        const height = 4000;
-        const margin = {top: 80, right: 30, bottom: 100, left: 100};
+        (function() {
+            const state = {
+                data: null,
+                transform: d3.zoomIdentity,
+                colorScale: null,
+                zoom: null,
+                width: 3000,
+                height: 3000,
+                margin: {top: 80, right: 30, bottom: 100, left: 100},
+                svg: null,
+                currentSort: 'frequency',
+                clusterData: null,
+                xScale: d3.scaleBand(),
+                yScale: d3.scaleBand(),
+                tooltip: d3.select('#tooltip'),
+                clusterMethod: 'none'
+            };
 
-        // Инициализация
-        function initVisualization() {
-            svg = d3.select("#heatmap")
-                .append("svg")
-                .attr("width", width)
-                .attr("height", height)
-                .call(d3.zoom()
-                    .scaleExtent([0.5, 8])
-                    .on("zoom", (event) => {
-                        currentTransform = event.transform;
-                        svg.attr("transform", currentTransform);
+            // Инициализация
+            function init() {
+                const container = d3.select("#heatmap");
+
+                state.svg = container.append("svg")
+                    .attr("viewBox", [0, 0, state.width, state.height])
+                    .call(state.zoom = d3.zoom()
+                        .scaleExtent([0.5, 8])
+                        .on("zoom", handleZoom))
+                    .append("g");
+
+                initAxes();
+                initEventHandlers();
+                loadData();
+            }
+
+            function getCellData(sortedTags) {
+                const indexMap = new Map(state.data.tags.map((t, i) => [t, i]));
+                return sortedTags.flatMap((yTag, i) =>
+                    sortedTags.map((xTag, j) => ({
+                        x: xTag,
+                        y: yTag,
+                        value: state.data.matrix[indexMap.get(yTag)][indexMap.get(xTag)]
                     }))
-                .append("g");
+                );
+            }
 
-            // Инициализация элементов
-            svg.append("g").attr("class", "x axis");
-            svg.append("g").attr("class", "y axis");
-        }
+            function handleZoom({transform}) {
+                state.transform = transform;
+                state.svg.attr("transform", transform);
+                updateAxisVisibility();
+            }
 
-        // Обновление визуализации
-        function updateVisualization(sortedTags) {
-            const data = sortedTags
-                ? {tags: sortedTags, matrix: resortMatrix(currentData, sortedTags)}
-                : currentData;
+            function initAxes() {
+                state.svg.append("g")
+                    .attr("class", "x-axis axis")
+                    .attr("transform", `translate(0,${state.margin.top})`);
 
-            // Обновляем шкалы
-            xScale = d3.scaleBand()
-                .domain(data.tags)
-                .range([margin.left, width - margin.right])
-                .padding(0.05);
+                state.svg.append("g")
+                    .attr("class", "y-axis axis")
+                    .attr("transform", `translate(${state.margin.left},0)`);
+            }
 
-            yScale = d3.scaleBand()
-                .domain(data.tags)
-                .range([margin.top, height - margin.bottom])
-                .padding(0.05);
+            async function loadData() {
+                try {
+                    const response = await fetch(buildApiUrl('/api/coocc_matrix_d3.json'));
+                    if (!response.ok) throw new Error('Ошибка загрузки данных');
+                    state.data = await response.json();
+                    state.colorScale = d3.scaleSequential(d3.interpolateYlOrRd)
+                        .domain([0, d3.max(state.data.matrix.flat())]);
 
-            // Обновляем оси
-            svg.select(".x.axis")
-                .attr("transform", `translate(0,${margin.top})`)
-                .call(d3.axisTop(xScale).tickSize(0))
-                .selectAll("text")
-                .style("text-anchor", "start")
-                .attr("transform", "rotate(45)");
+                    const sortedTags = sortByFrequency();
+                    updateVisualization(sortedTags);
+                } catch (error) {
+                    console.error('Ошибка:', error);
+                    showErrorNotification('Не удалось загрузить данные');
+                }
+            }
 
-            svg.select(".y.axis")
-                .attr("transform", `translate(${margin.left},0)`)
-                .call(d3.axisLeft(yScale).tickSize(0))
-                .selectAll("text")
-                .style("text-anchor", "end")
-                .attr("transform", "rotate(-45)");
+            function updateVisualization(sortedTags) {
+                updateScales(sortedTags);
+                drawCells(sortedTags);
+                updateAxis();
 
-            // Обновляем ячейки
-            const cells = svg.selectAll(".cell")
-                .data(data.tags.flatMap((d, i) =>
-                    data.tags.map((t, j) => ({
-                        x: t,
-                        y: d,
-                        value: data.matrix[i][j]
+                if (state.clusterMethod !== 'none') {
+                    drawClusterBorders();
+                }
+            }
+
+            function drawCells(sortedTags) {
+                const cells = state.svg.selectAll(".cell")
+                    .data(getCellData(sortedTags), d => `${d.x}-${d.y}`);
+
+                cells.exit().remove();
+
+                cells.enter()
+                    .append("rect")
+                    .attr("class", "cell")
+                    .on("mouseover", showTooltip)
+                    .on("mouseout", hideTooltip)
+                    .merge(cells)
+                    .attr("x", d => state.xScale(d.x))
+                    .attr("y", d => state.yScale(d.y))
+                    .attr("width", state.xScale.bandwidth())
+                    .attr("height", state.yScale.bandwidth())
+                    .attr("fill", d => state.colorScale(d.value));
+            }
+
+            function sortByFrequency() {
+                return state.data.tags
+                    .map((tag, i) => ({
+                        tag,
+                        count: state.data.matrix[i].reduce((a, b) => a + b, 0)
                     }))
-                ));
+                    .sort((a, b) => b.count - a.count)
+                    .map(d => d.tag);
+            }
 
-            cells.exit().remove();
+            function handleSortChange() {
+                const method = this.value;
+                state.currentSort = method;
+                const sorted = method === 'frequency' ? sortByFrequency() : [...state.data.tags].sort();
+                updateVisualization(sorted);
+            }
 
-            cells.enter()
-                .append("rect")
-                .attr("class", "cell")
-                .on("mouseover", showTooltip)
-                .on("mouseout", hideTooltip)
-                .merge(cells)
-                .attr("x", d => xScale(d.x))
-                .attr("y", d => yScale(d.y))
-                .attr("width", xScale.bandwidth())
-                .attr("height", yScale.bandwidth())
-                .attr("fill", d => colorScale(d.value));
-        }
+            async function handleClusterChange() {
+                state.clusterMethod = this.value;
+                if (state.clusterMethod === 'hierarchical') {
+                    try {
+                        const response = await fetch(buildApiUrl('/api/coocc_clusters_d3.json'));
+                        if (!response.ok) throw new Error('Ошибка HTTP');
+                        state.clusterData = await response.json();
+                        updateVisualization(extractClusterOrder(d3.hierarchy(state.clusterData)));
+                    } catch (error) {
+                        handleClusterError(error);
+                    }
+                } else {
+                    state.clusterData = null;
+                    updateVisualization(state.currentSort === 'frequency' ? sortByFrequency() : [...state.data.tags].sort());
+                }
+            }
 
-        // Функции для работы с данными
-        function resortMatrix(data, sortedTags) {
-            const indexMap = new Map(sortedTags.map((tag, i) => [tag, i]));
-            return sortedTags.map(tag1 =>
-                sortedTags.map(tag2 =>
-                    data.matrix[data.tags.indexOf(tag1)][data.tags.indexOf(tag2)]
-                )
-            );
-        }
+            function extractClusterOrder(node) {
+                const order = [];
+                node.each(d => {
+                    if (!d.children) order.push(d.data.name);
+                });
+                return order;
+            }
 
-        function sortByFrequency(data) {
-            const frequencies = data.tags.map((tag, i) => ({
-                tag,
-                count: data.matrix[i].reduce((a, b) => a + b, 0)
-            }));
+            function drawClusterBorders() {
+                const clusterHierarchy = d3.hierarchy(state.clusterData);
+                const clusterBounds = calculateClusterBounds(clusterHierarchy);
 
-            return frequencies
-                .sort((a, b) => b.count - a.count)
-                .map(d => d.tag);
-        }
+                state.svg.selectAll('.cluster-border').remove();
 
-        // Обработчики событий
-        function showTooltip(event, d) {
-            const tooltip = d3.select("#tooltip");
-            tooltip
-                .html(`${d.y} ↔ ${d.x}<br>Совместных упоминаний: ${d.value}`)
-                .style("left", `${event.pageX + 10}px`)
-                .style("top", `${event.pageY + 10}px`)
-                .style("opacity", 1);
-        }
+                clusterBounds.forEach((bounds, i) => {
+                    state.svg.append('rect')
+                        .attr('class', 'cluster-border')
+                        .attr('x', bounds.x)
+                        .attr('y', bounds.y)
+                        .attr('width', bounds.width)
+                        .attr('height', bounds.height)
+                        .style('stroke', getClusterColor(i));
+                });
+            }
 
-        function hideTooltip() {
-            d3.select("#tooltip").style("opacity", 0);
-        }
+            function calculateClusterBounds(node) {
+                const bounds = [];
+                node.eachAfter(n => {
+                    if (n.children) {
+                        const leaves = n.leaves();
+                        const xStart = state.xScale(leaves[0].data.name);
+                        const xEnd = state.xScale(leaves[leaves.length - 1].data.name);
+                        bounds.push({
+                            x: xStart - 5,
+                            y: state.yScale(n.data.name) - 5,
+                            width: xEnd - xStart + state.xScale.bandwidth() + 10,
+                            height: state.yScale.bandwidth() + 10
+                        });
+                    }
+                });
+                return bounds;
+            }
 
-        // Управление масштабом
-        function zoomIn() {
-            currentTransform = currentTransform.scale(1.2);
-            svg.transition().call(zoom.transform, currentTransform);
-        }
+            // Остальные функции (initEventHandlers, buildApiUrl, showErrorNotification и т.д.)
 
-        function zoomOut() {
-            currentTransform = currentTransform.scale(0.8);
-            svg.transition().call(zoom.transform, currentTransform);
-        }
+            // Вспомогательные функции
+            function buildApiUrl(basePath) {
+                // const url = new URL(basePath, window.location.href);
+                // const params = new URLSearchParams(window.location.search);
+                // params.forEach((v, k) => url.searchParams.set(k, v));
+                // return url;
+                const url = new URL(basePath, window.location.origin);
+                const group = new URLSearchParams(window.location.search).get('group');
+                if (group) {
+                    url.searchParams.set('group', group);
+                }
+                const minFrequency = document.getElementById('min-frequency').value;
+                if (minFrequency > 0) {
+                    url.searchParams.set('min_frequency', minFrequency);
+                }
+                return url;
+            }
 
-        function resetZoom() {
-            currentTransform = d3.zoomIdentity;
-            svg.transition().call(zoom.transform, currentTransform);
-        }
+            function resortMatrix(data, sortedTags) {
+                const indexMap = new Map(data.tags.map((t, i) => [t, i]));
+                return sortedTags.map(t1 =>
+                    sortedTags.map(t2 =>
+                        data.matrix[indexMap.get(t1)][indexMap.get(t2)]
+                    )
+                );
+            }
 
-        // Обработчик сортировки
-        d3.select("#sort-select").on("change", function() {
-            if (!currentData) return;
+            // Обработчики событий
+            function initEventHandlers() {
+                d3.select("#sort-select").on("change", handleSortChange);
+                d3.select("#cluster-method").on("change", handleClusterChange);
+                d3.select(".btn-apply").on("click", handleFilter);
+                d3.select("#tag-search").on("input", handleSearch);
 
-            const sortedTags = this.value === "frequency"
-                ? sortByFrequency(currentData)
-                : [...currentData.tags].sort();
+                d3.selectAll(".btn-zoom").on("click", function() {
+                    const factor = this.textContent === '+' ? 1.2 : 0.8;
+                    state.transform = state.transform.scale(factor);
+                    state.svg.transition().call(state.zoom.transform, state.transform);
+                });
 
-            updateVisualization(sortedTags);
-        });
+                d3.select(".btn-reset").on("click", () => {
+                    state.transform = d3.zoomIdentity;
+                    state.svg.transition().call(state.zoom.transform, state.transform);
+                });
 
-        // Инициализация и загрузка данных
-        initVisualization();
+                d3.select("#search-results").on("click", ".search-result", function() {
+                    const tag = this.dataset.tag;
+                    highlightTag(tag);
+                });
+            }
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const group = urlParams.get('group') || '';
-        const url = group ? `/api/coocc_matrix_d3.json?group=${encodeURIComponent(group)}` : '/api/coocc_matrix_d3.json';
-        fetch(url)
-            .then(response => response.json())
-            .then(data => {
-                currentData = data;
-                colorScale = d3.scaleSequential()
-                    .interpolator(d3.interpolateYlOrRd)
-                    .domain([0, d3.max(data.matrix.flat())]);
+            function handleClusterError(error) {
+                console.error('Cluster Error:', error);
+                showErrorNotification(`Ошибка кластеризации: ${error.message}`);
+                // Восстанавливаем исходное состояние
+                state.svg.selectAll('.cluster-border').remove();
+                updateVisualization(state.data.tags);
+            }
 
-                updateVisualization(sortByFrequency(data));
-            });
+            async function handleFilter() {
+                try {
+                    const response = await fetch(buildApiUrl('/api/coocc_matrix_d3.json'));
+                    if (!response.ok) throw new Error('Ошибка фильтрации');
+                    state.data = await response.json();
+                    updateVisualization(state.currentSort === 'frequency' ? sortByFrequency() : [...state.data.tags].sort());
+                } catch (error) {
+                    console.error('Ошибка фильтрации:', error);
+                    showErrorNotification('Ошибка применения фильтра');
+                }
+            }
+
+            function showErrorNotification(message) {
+                const notification = d3.select('body')
+                    .append('div')
+                    .attr('class', 'error-notification')
+                    .text(message)
+                    .style('position', 'fixed')
+                    .style('top', '20px')
+                    .style('right', '20px')
+                    .style('padding', '10px')
+                    .style('background', '#ff4444')
+                    .style('color', 'white')
+                    .style('border-radius', '4px');
+
+                setTimeout(() => notification.remove(), 3000);
+            }
+
+            function getClusterColor(index) {
+                const colors = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2'];
+                return colors[index % colors.length];
+            }
+
+            async function updateClusters(clusterData) {
+                try {
+                    // Проверяем готовность всех компонентов
+                    if (!state.data || !state.xScale || !state.yScale || !state.xScale.domain()) {
+                        throw new Error('Дождитесь полной загрузки данных');
+                    }
+
+                    // Очищаем предыдущие кластеры
+                    state.svg.selectAll('.cluster-border').remove();
+
+                    // Сортируем теги согласно кластерной иерархии
+                    const orderedTags = extractClusterOrder(d3.hierarchy(clusterData));
+                    updateVisualization(orderedTags);
+
+                    // Рисуем границы кластеров
+                    const clusterHierarchy = d3.hierarchy(clusterData);
+                    const clusterBounds = calculateClusterBounds(clusterHierarchy);
+
+                    clusterBounds.forEach((bounds, i) => {
+                        state.svg.append('rect')
+                            .attr('class', 'cluster-border')
+                            .attr('x', bounds.x)
+                            .attr('y', bounds.y)
+                            .attr('width', bounds.width)
+                            .attr('height', bounds.height)
+                            .style('stroke', getClusterColor(i));
+                    });
+
+                } catch (error) {
+                    console.error('Ошибка кластеризации:', error);
+                    showErrorNotification(error.message);
+                }
+            }
+
+            function highlightTag(tag) {
+                // Сбрасываем предыдущую подсветку
+                state.svg.selectAll('.cell')
+                    .classed('highlighted', false);
+
+                // Устанавливаем новую подсветку
+                state.svg.selectAll('.cell')
+                    .filter(d => d.x === tag || d.y === tag)
+                    .classed('highlighted', true);
+
+                state.highlightedTag = tag;
+                d3.select("#search-results").style('display', 'none');
+            }
+
+            async function handleSearch() {
+                try {
+                    const query = this.value.trim();
+                    state.searchResults = [];
+                    d3.select("#search-results").html('');
+
+                    if (query.length < 2) return;
+
+                    const url = buildApiUrl('/api/search_tags.json');
+                    url.searchParams.set('q', query);
+
+                    const response = await fetch(url);
+                    if (!response.ok) throw new Error('Ошибка поиска');
+
+                    state.searchResults = await response.json();
+
+                    // Отображение результатов
+                    const resultsHtml = state.searchResults
+                        .map(tag => `
+                <div class="search-result" data-tag="${tag}">
+                    ${tag}
+                </div>
+            `).join('');
+
+                    d3.select("#search-results")
+                        .html(resultsHtml)
+                        .style('display', 'block');
+
+                } catch (error) {
+                    console.error('Ошибка поиска:', error);
+                    showErrorNotification('Ошибка выполнения поиска');
+                }
+            }
+
+            function updateAxis() {
+                // Убедимся что шкалы инициализированы
+                if (!state.xScale || !state.yScale) return;
+
+                // X Axis
+                state.svg.select(".x-axis")
+                    .call(d3.axisTop(state.xScale))
+                    .selectAll("text")
+                    .style("font-size", "10px")
+                    .attr("transform", "rotate(45)")
+                    .style("text-anchor", "start")
+                    .style("fill", "#333");
+
+                // Y Axis
+                state.svg.select(".y-axis")
+                    .call(d3.axisLeft(state.yScale))
+                    .selectAll("text")
+                    .style("font-size", "10px")
+                    .attr("transform", "rotate(-45)")
+                    .style("text-anchor", "end")
+                    .style("fill", "#333");
+
+                // Оптимизация видимости
+                const minScale = 0.6;
+                state.svg.selectAll(".axis text")
+                    .style("display", state.transform.k < minScale ? "none" : "block")
+                    .style("opacity", Math.min(1, (state.transform.k - minScale) * 2));
+            }
+
+            function showTooltip(event, d) {
+                const tooltip = d3.select("#tooltip");
+                const [x, y] = d3.pointer(event, window);
+
+                tooltip
+                    .html(`
+            <strong>${d.y} ↔ ${d.x}</strong>
+            <div>Совпадений: ${d.value}</div>
+            ${state.clusterData ? `<div>Кластер: ${getClusterForTag(d.y)}</div>` : ''}
+        `)
+                    .style("left", `${x + 15}px`)
+                    .style("top", `${y - 25}px`)
+                    .transition()
+                    .duration(200)
+                    .style("opacity", 0.95)
+                    .style("pointer-events", "none");
+            }
+
+            function hideTooltip() {
+                d3.select("#tooltip")
+                    .transition()
+                    .duration(100)
+                    .style("opacity", 0);
+            }
+
+            function getClusterForTag(tag) {
+                if (!state.clusterData) return null;
+
+                let clusterId = -1;
+                const findInCluster = (node) => {
+                    if (node.children) {
+                        node.children.forEach(findInCluster);
+                    } else if (node.data.name === tag) {
+                        clusterId = node.parent.data.clusterId;
+                    }
+                };
+
+                findInCluster(d3.hierarchy(state.clusterData));
+                return clusterId !== -1 ? clusterId : 'N/A';
+            }
+
+            function updateScales(sortedTags) {
+                if (!state.data) return;
+
+                // Обновляем X шкалу
+                state.xScale
+                    .domain(sortedTags)
+                    .range([state.margin.left, state.width - state.margin.right])
+                    .padding(0.05);
+
+                // Обновляем Y шкалу
+                state.yScale
+                    .domain(sortedTags)
+                    .range([state.margin.top, state.height - state.margin.bottom])
+                    .padding(0.05);
+            }
+
+            function updateAxisVisibility() {
+                const minScale = 0.6;
+                state.svg.selectAll(".axis text")
+                    .style("display", state.transform.k < minScale ? "none" : "block")
+                    .style("opacity", Math.min(1, (state.transform.k - minScale) * 2));
+            }
+
+            // Запуск приложения
+            init();
+        })();
     });
 </script>
 {{end}}

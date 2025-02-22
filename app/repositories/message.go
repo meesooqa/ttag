@@ -78,6 +78,44 @@ func (r *MessageRepository) GetUniqueValues(ctx context.Context, fieldName strin
 	return convertToStrings(values), nil
 }
 
+func (r *MessageRepository) GetTags(ctx context.Context, query string) ([]string, error) {
+	var results []string
+	cursor, err := r.collection.Aggregate(ctx,
+		mongo.Pipeline{
+			bson.D{{"$unwind", "$tags"}},
+			bson.D{{"$group", bson.D{{"_id", "$tags"}}}},
+			bson.D{{"$match", bson.D{{"_id", bson.D{{"$regex", query}, {"$options", "i"}}}}}},
+		})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := cursor.Close(ctx); err != nil {
+			r.log.Error("cursor close error", "err", err)
+		}
+	}()
+	//err = cursor.All(ctx, &results)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	type res struct {
+		ID string `bson:"_id"`
+	}
+
+	for cursor.Next(ctx) {
+		var elem res
+		if err := cursor.Decode(&elem); err != nil {
+			return nil, fmt.Errorf("decode error: %w", err)
+		}
+		if elem.ID != "" {
+			results = append(results, elem.ID)
+		}
+	}
+
+	return results, nil
+}
+
 func convertToStrings(values []interface{}) []string {
 	result := make([]string, 0, len(values))
 	for _, v := range values {

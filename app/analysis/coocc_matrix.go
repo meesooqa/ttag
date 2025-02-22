@@ -9,9 +9,14 @@ import (
 	"github.com/meesooqa/ttag/app/repositories"
 )
 
+type ClusterRequest struct {
+	MinClusterSize int `json:"min_cluster_size"`
+}
+
 type CooccMatrixDataProvider struct {
-	log  *slog.Logger
-	repo repositories.Repository
+	log          *slog.Logger
+	repo         repositories.Repository
+	minFrequency int
 }
 
 type CooccMatrixData struct {
@@ -24,6 +29,10 @@ func NewCooccMatrixDataProvider(log *slog.Logger, repo repositories.Repository) 
 		log:  log,
 		repo: repo,
 	}
+}
+
+func (p *CooccMatrixDataProvider) SetMinFrequency(minFrequency int) {
+	p.minFrequency = minFrequency
 }
 
 func (p *CooccMatrixDataProvider) GetData(ctx context.Context, group string) AnalyzedData {
@@ -81,6 +90,31 @@ func (p *CooccMatrixDataProvider) GetData(ctx context.Context, group string) Ana
 		for j := range result[i] {
 			result[i][j] = matrix[tagI][tags[j]]
 		}
+	}
+
+	// Применяем фильтр частоты
+	if p.minFrequency > 0 {
+		filteredTags := make([]string, 0)
+		for _, tag := range tags {
+			total := 0
+			for _, count := range matrix[tag] {
+				total += count
+			}
+			if total >= p.minFrequency {
+				filteredTags = append(filteredTags, tag)
+			}
+		}
+
+		// Перестраиваем матрицу с отфильтрованными тегами
+		newMatrix := make([][]int, len(filteredTags))
+		for i := range newMatrix {
+			newMatrix[i] = make([]int, len(filteredTags))
+			for j := range newMatrix[i] {
+				newMatrix[i][j] = matrix[filteredTags[i]][filteredTags[j]]
+			}
+		}
+		tags = filteredTags
+		result = newMatrix
 	}
 
 	// Отправляем ответ
