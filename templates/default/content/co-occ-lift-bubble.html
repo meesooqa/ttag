@@ -1,0 +1,88 @@
+{{define "content"}}
+<style>
+    body {
+        font-family: Arial, sans-serif;
+    }
+    svg {
+        border: 1px solid #ccc;
+    }
+    .node {
+        stroke: #fff;
+        stroke-width: 1.5px;
+    }
+    .link {
+        stroke: #999;
+        stroke-opacity: 0.6;
+    }
+    .labels {
+        font-size: 12px;
+        fill: #333;
+    }
+    .cell { stroke: #ccc; }
+    .node {
+        stroke: #fff;
+        stroke-width: 1.5px;
+    }
+    .label {
+        font-family: sans-serif;
+        text-anchor: middle;
+        fill: #333;
+        pointer-events: none;
+    }
+</style>
+<svg id="bubble" width="1000" height="1000"></svg>
+<script>
+    function buildApiUrl(base) {
+        const url = new URL(base, window.location.href);
+        const params = new URLSearchParams(window.location.search);
+        params.forEach((v, k) => url.searchParams.set(k, v));
+        return url;
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        d3.json(buildApiUrl('/api/coocc_lift_d3.json')).then(function(data) {
+            const svg = d3.select("svg#bubble");
+            if (!svg) {
+                return;
+            }
+
+            const nodes = Object.entries(data.tagFreq).map(([tag, frequency]) => ({
+                id: tag,
+                frequency: frequency
+            }));
+
+            const width = +svg.attr("width"),
+                height = +svg.attr("height");
+
+            // Преобразуем данные в иерархическую структуру.
+            const root = d3.hierarchy({ children: nodes })
+                .sum(d => d.frequency)
+                .sort((a, b) => b.value - a.value);
+
+            const pack = d3.pack()
+                .size([width, height])
+                .padding(5);
+
+            pack(root);
+
+            const node = svg.selectAll("g")
+                .data(root.leaves())
+                .enter().append("g")
+                .attr("transform", d => `translate(${d.x},${d.y})`);
+
+            node.append("circle")
+                .attr("class", "node")
+                .attr("r", d => d.r)
+                .attr("fill", d => d3.schemeCategory10[d.data.id.charCodeAt(0) % 10]);
+
+            node.append("text")
+                .attr("class", "label")
+                .attr("dy", "0.3em")
+                .text(d => d.data.id)
+                .style("font-size", d => Math.min(2 * d.r, (2 * d.r - 8) / d.data.id.length) + "px");
+        }).catch(function(error) {
+            console.error("Ошибка загрузки данных:", error);
+        });
+    });
+</script>
+{{end}}
