@@ -311,10 +311,10 @@ return;
             // Определяем множества антецедентов и консеквентов.
             const antecedentsSet = new Set();
             const consequentsSet = new Set();
-            apiData.pairs.forEach(d => {
-                if (d.tagA && d.tagB) {
-                    antecedentsSet.add(d.tagA);
-                    consequentsSet.add(d.tagB);
+            apiData.Pairs.forEach(d => {
+                if (d.TagA && d.TagB) {
+                    antecedentsSet.add(d.TagA);
+                    consequentsSet.add(d.TagB);
                 }
             });
             // Преобразуем множества в отсортированные массивы
@@ -327,7 +327,7 @@ return;
             antecedents.forEach(a => {
                 const row = [];
                 consequents.forEach(b => {
-                    const rule = apiData.pairs.find(d => d.tagA === a && d.tagB === b);
+                    const rule = apiData.Pairs.find(d => d.TagA === a && d.TagB === b);
                     row.push(rule ? rule.confidence : 0);
                 });
                 matrix.push(row);
