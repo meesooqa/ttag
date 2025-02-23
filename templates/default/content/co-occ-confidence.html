@@ -1,1 +1,175 @@
-{{define "content"}}{{end}}
+{{define "content"}}
+<style>
+    .node { stroke: #fff; stroke-width: 1.5px; }
+    .link { stroke: #999; stroke-opacity: 0.6; }
+    .label { font-size: 12px; fill: #333; }
+    #thresholdValue { font-weight: bold; }
+</style>
+<h2>Directed Network Graph для Confidence</h2>
+<label for="threshold">
+    Минимальный порог Confidence: <span id="thresholdValue">0.01</span>
+</label>
+<input type="range" id="threshold" min="0" max="1" step="0.01" value="0.01">
+<br><br>
+<svg id="dngraph" width="1200" height="1200"></svg>
+<script>
+    function buildApiUrl(base) {
+        const url = new URL(base, window.location.href);
+        const params = new URLSearchParams(window.location.search);
+        params.forEach((v, k) => url.searchParams.set(k, v));
+        return url;
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        (function() {
+            const svg = d3.select("svg#dngraph");
+            if (!svg) return;
+
+            const state = {
+                allData: null,
+                simulation: null,
+                link: null,
+                node: null,
+                label: null,
+                currentThreshold: 0.5,
+            }
+
+            const width = +svg.attr("width"),
+                height = +svg.attr("height");
+
+            // Создаем маркер для стрелок (направленных ребер)
+            svg.append("defs").append("marker")
+                .attr("id", "arrow")
+                .attr("viewBox", "0 -5 10 10")
+                .attr("refX", 15)
+                .attr("refY", 0)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M0,-5L10,0L0,5")
+                .attr("fill", "#999");
+
+            d3.json(buildApiUrl('/api/coocc_confidence_d3.json')).then(data => {
+                state.allData = data; // data.pairs: массив объектов с полями tagA, tagB, confidence
+                updateGraph();
+            }).catch(error => {
+                console.error("Ошибка загрузки данных:", error);
+            });
+
+            // Функция для обновления графа с учетом текущего порога
+            function updateGraph() {
+                // Фильтруем правила по порогу Confidence
+                const filteredLinks = state.allData.pairs.filter(d =>
+                    d.confidence >= state.currentThreshold && d.tagA && d.tagB
+                );
+                const links = filteredLinks.map(d => ({
+                    source: d.tagA,
+                    target: d.tagB,
+                    confidence: d.confidence
+                }));
+
+                // Формируем множество узлов на основе тегов, встречающихся в правилах
+                const nodesSet = new Set();
+                filteredLinks.forEach(d => {
+                    nodesSet.add(d.tagA);
+                    nodesSet.add(d.tagB);
+                });
+                const nodes = Array.from(nodesSet).map(tag => ({ id: tag }));
+
+                // Если уже существует симуляция, останавливаем её и очищаем SVG
+                if (state.simulation) {
+                    state.simulation.stop();
+                    svg.selectAll("*").remove();
+                    // Восстанавливаем определение маркера для стрелок
+                    svg.append("defs").append("marker")
+                        .attr("id", "arrow")
+                        .attr("viewBox", "0 -5 10 10")
+                        .attr("refX", 15)
+                        .attr("refY", 0)
+                        .attr("markerWidth", 6)
+                        .attr("markerHeight", 6)
+                        .attr("orient", "auto")
+                        .append("path")
+                        .attr("d", "M0,-5L10,0L0,5")
+                        .attr("fill", "#999");
+                }
+
+                // Создаем силовую симуляцию
+                state.simulation = d3.forceSimulation(nodes)
+                    .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+                    .force("charge", d3.forceManyBody().strength(-200))
+                    .force("center", d3.forceCenter(width / 2, height / 2));
+                state.simulation.force("link").links(links);
+
+                // Отрисовка ребер
+                state.link = svg.append("g")
+                    .attr("class", "links")
+                    .selectAll("line")
+                    .data(filteredLinks)
+                    .enter().append("line")
+                    .attr("class", "link")
+                    .attr("stroke-width", d => d.confidence * 5) // толщина пропорциональна confidence
+                    .attr("marker-end", "url(#arrow)");
+
+                // Отрисовка узлов
+                state.node = svg.append("g")
+                    .attr("class", "nodes")
+                    .selectAll("circle")
+                    .data(nodes)
+                    .enter().append("circle")
+                    .attr("class", "node")
+                    .attr("r", 8)
+                    .attr("fill", "steelblue")
+                    .call(d3.drag()
+                        .on("start", dragstarted)
+                        .on("drag", dragged)
+                        .on("end", dragended));
+
+                // Добавляем подписи для узлов
+                state.label = svg.append("g")
+                    .attr("class", "labels")
+                    .selectAll("text")
+                    .data(nodes)
+                    .enter().append("text")
+                    .attr("class", "label")
+                    .attr("dy", -10)
+                    .text(d => d.id);
+
+                state.simulation.on("tick", () => {
+                    state.link.attr("x1", d => d.source ? d.source.x : 0)
+                        .attr("y1", d => d.source ? d.source.y : 0)
+                        .attr("x2", d => d.target ? d.target.x : 0)
+                        .attr("y2", d => d.target ? d.target.y : 0);
+                    state.node.attr("cx", d => d.x)
+                        .attr("cy", d => d.y);
+                    state.label.attr("x", d => d.x)
+                        .attr("y", d => d.y);
+                });
+            }
+
+            // Обработчики событий для перетаскивания узлов
+            function dragstarted(event, d) {
+                if (!event.active) state.simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            function dragended(event, d) {
+                if (!event.active) state.simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+
+            // Обработчик изменения ползунка для динамического фильтра
+            d3.select("#threshold").on("input", function() {
+                state.currentThreshold = +this.value;
+                d3.select("#thresholdValue").text(state.currentThreshold.toFixed(2));
+                updateGraph();
+            });
+        })();
+    });
+</script>
+{{end}}
