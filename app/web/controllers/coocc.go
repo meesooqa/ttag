@@ -29,6 +29,7 @@ func NewCooccController(log *slog.Logger, tpl Template) *CooccController {
 		NewCooccSupportController(log, tpl),
 		NewCooccJaccardController(log, tpl),
 		NewCooccPmiController(log, tpl),
+		NewCooccConfidenceController(log, tpl),
 		NewCooccAmController(log, tpl),
 	)
 	return c
