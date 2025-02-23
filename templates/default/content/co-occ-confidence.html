@@ -183,11 +183,22 @@ return;
             if (!svg) return;
             const apiData = data
 
-            // Преобразование данных в формат Sankey Diagram:
-            // Необходимо сформировать два массива: nodes и links.
-            // Узлы – уникальные теги, а связи – правила с полями source, target и value (confidence).
-            const nodesSet = new Set();
+            // Агрегируем данные, чтобы для каждой уникальной пары (без учёта порядка)
+            // сохранить только одно направление с более высоким значением Confidence.
+            const pairMap = {};
             apiData.pairs.forEach(d => {
+                // Формируем ключ как отсортированную пару
+                const key = [d.tagA, d.tagB].sort().join('|');
+                if (!pairMap[key] || d.confidence > pairMap[key].confidence) {
+                    // Сохраним оригинальное направление из объекта d
+                    pairMap[key] = d;
+                }
+            });
+            const uniquePairs = Object.values(pairMap);
+
+            // Формирование массива узлов: уникальные теги
+            const nodesSet = new Set();
+            uniquePairs.forEach(d => {
                 if (d.tagA && d.tagB) {
                     nodesSet.add(d.tagA);
                     nodesSet.add(d.tagB);
@@ -201,14 +212,14 @@ return;
                 nodeIndex[node.name] = i;
             });
 
-            // Формируем массив ссылок (links)
-            const linksArray = apiData.pairs.map(d => ({
+            // Формируем массив ссылок для sankey (source и target — индексы узлов)
+            const linksArray = uniquePairs.map(d => ({
                 source: nodeIndex[d.tagA],
                 target: nodeIndex[d.tagB],
                 value: d.confidence
             }));
 
-            // Формируем объект данных для sankey
+            // Собираем данные для sankey
             const sankeyData = {
                 nodes: nodesArray,
                 links: linksArray
