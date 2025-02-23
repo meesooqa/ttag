@@ -11,12 +11,13 @@ type CooccConfidenceController struct {
 
 func NewCooccConfidenceController(log *slog.Logger, tpl Template) *CooccConfidenceController {
 	c := &CooccConfidenceController{BaseController{
-		log:        log,
-		tpl:        tpl,
-		method:     http.MethodGet,
-		route:      "/co-occ/confidence/",
-		title:      "Confidence",
-		contentTpl: "content/co-occ-confidence.html",
+		log:    log,
+		tpl:    tpl,
+		method: http.MethodGet,
+		route:  "/co-occ/confidence/",
+		title:  "Confidence",
+		//contentTpl: "content/co-occ-confidence.html",
+		contentTpl: "content/co-occ-confidence-001.html",
 	}}
 	c.self = c
 	return c

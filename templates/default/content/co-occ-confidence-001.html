@@ -1,0 +1,39 @@
+{{define "content"}}
+<link href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
+<h3 style="text-align: center;">Таблица правил Confidence</h3>
+<div id="wrapper" style="margin: 20px;"></div>
+<script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+<script>
+function buildApiUrl(base) {
+    const url = new URL(base, window.location.href);
+    const params = new URLSearchParams(window.location.search);
+    params.forEach((v, k) => url.searchParams.set(k, v));
+    return url;
+}
+document.addEventListener('DOMContentLoaded', function() {
+d3.json(buildApiUrl('/api/coocc_confidence_d3.json')).then(data => {
+    const gridData = data.Pairs.map(rule => [
+        rule.TagA,
+        rule.TagB,
+        rule.Value.toFixed(2)
+    ]);
+
+    new gridjs.Grid({
+        columns: [
+            { id: 'tagA', name: 'Антецедент (A)' },
+            { id: 'tagB', name: 'Консеквент (B)' },
+            { id: 'confidence', name: 'Confidence' }
+        ],
+        data: gridData,
+        search: true,
+        sort: true,
+        pagination: {
+            limit: 10
+        }
+    }).render(document.getElementById("wrapper"));
+}).catch(error => {
+    console.error("Ошибка загрузки данных:", error);
+});
+});
+</script>
+{{end}}
