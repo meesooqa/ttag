@@ -1,17 +1,23 @@
 {{define "content"}}
+<script src="https://unpkg.com/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
 <style>
-    .node { stroke: #fff; stroke-width: 1.5px; }
-    .link { stroke: #999; stroke-opacity: 0.6; }
-    .label { font-size: 12px; fill: #333; }
-    #thresholdValue { font-weight: bold; }
+    /*.node { stroke: #fff; stroke-width: 1.5px; }*/
+    /*.link { stroke: #999; stroke-opacity: 0.6; }*/
+    /*.label { font-size: 12px; fill: #333; }*/
+    /*#thresholdValue { font-weight: bold; }*/
+
+    .node rect {cursor: move;fill-opacity: 0.9;shape-rendering: crispEdges;}
+    .node text {pointer-events: none;font-size: 12px;}
+    .link {fill: none;stroke: #000;stroke-opacity: 0.2;}
+    .link:hover {stroke-opacity: 0.5;}
 </style>
-<h2>Directed Network Graph для Confidence</h2>
-<label for="threshold">
-    Минимальный порог Confidence: <span id="thresholdValue">0.01</span>
-</label>
-<input type="range" id="threshold" min="0" max="1" step="0.01" value="0.01">
-<br><br>
-<svg id="dngraph" width="1200" height="1200"></svg>
+<!--<h3>Directed Network Graph для Confidence</h3>-->
+<!--<label for="threshold">Минимальный порог Confidence: <span id="thresholdValue">0.01</span></label>-->
+<!--<input type="range" id="threshold" min="0" max="1" step="0.01" value="0.01">-->
+<!--<br><br>-->
+<!--<svg id="dngraph" width="1200" height="1200"></svg>-->
+<h3>Sankey Diagram для Confidence</h3>
+<svg id="sankey" width="1200" height="1200"></svg>
 <script>
     function buildApiUrl(base) {
         const url = new URL(base, window.location.href);
@@ -21,6 +27,7 @@
     }
     document.addEventListener('DOMContentLoaded', function() {
         (function() {
+return;
             const svg = d3.select("svg#dngraph");
             if (!svg) return;
 
@@ -170,6 +177,104 @@
                 updateGraph();
             });
         })();
+
+        d3.json(buildApiUrl('/api/coocc_confidence_d3.json')).then(data => {
+            const svg = d3.select("svg#sankey");
+            if (!svg) return;
+            const apiData = data
+
+            // Преобразование данных в формат Sankey Diagram:
+            // Необходимо сформировать два массива: nodes и links.
+            // Узлы – уникальные теги, а связи – правила с полями source, target и value (confidence).
+            const nodesSet = new Set();
+            apiData.pairs.forEach(d => {
+                if (d.tagA && d.tagB) {
+                    nodesSet.add(d.tagA);
+                    nodesSet.add(d.tagB);
+                }
+            });
+            const nodesArray = Array.from(nodesSet).map(tag => ({ name: tag }));
+
+            // Создаем отображение тега в индекс узла
+            const nodeIndex = {};
+            nodesArray.forEach((node, i) => {
+                nodeIndex[node.name] = i;
+            });
+
+            // Формируем массив ссылок (links)
+            const linksArray = apiData.pairs.map(d => ({
+                source: nodeIndex[d.tagA],
+                target: nodeIndex[d.tagB],
+                value: d.confidence
+            }));
+
+            // Формируем объект данных для sankey
+            const sankeyData = {
+                nodes: nodesArray,
+                links: linksArray
+            };
+
+            // Настройка sankey генератора
+            const sankey = d3.sankey()
+                .nodeWidth(20)
+                .nodePadding(10)
+                .size([960, 500]);
+
+            // Вычисляем расположение узлов и связей
+            const {nodes, links} = sankey(sankeyData);
+
+            // Отрисовка ссылок (flows)
+            svg.append("g")
+                .selectAll(".link")
+                .data(links)
+                .enter().append("path")
+                .attr("class", "link")
+                .attr("d", d3.sankeyLinkHorizontal())
+                .attr("stroke-width", d => Math.max(1, d.width))
+                .style("stroke", "#888")
+                .append("title")
+                .text(d => `${d.source.name} → ${d.target.name}\nConfidence: ${d.value}`);
+
+            // Отрисовка узлов
+            const nodeG = svg.append("g")
+                .selectAll(".node")
+                .data(nodes)
+                .enter().append("g")
+                .attr("class", "node")
+                .attr("transform", d => `translate(${d.x0},${d.y0})`)
+                .call(d3.drag()
+                    .subject(d => d)
+                    .on("start", function(event, d) { this.parentNode.appendChild(this); })
+                    .on("drag", dragmove));
+
+            nodeG.append("rect")
+                .attr("height", d => d.y1 - d.y0)
+                .attr("width", sankey.nodeWidth())
+                .style("fill", d => d.color = d3.schemeCategory10[d.index % 10])
+                .style("stroke", d => d3.rgb(d.color).darker(2))
+                .append("title")
+                .text(d => `${d.name}\nTotal Confidence: ${d.value}`);
+
+            nodeG.append("text")
+                .attr("x", -6)
+                .attr("y", d => (d.y1 - d.y0) / 2)
+                .attr("dy", "0.35em")
+                .attr("text-anchor", "end")
+                .text(d => d.name)
+                .filter(d => d.x0 < 960 / 2)
+                .attr("x", 6 + sankey.nodeWidth())
+                .attr("text-anchor", "start");
+
+            function dragmove(event, d) {
+                d.y0 = Math.max(0, Math.min(500 - (d.y1 - d.y0), event.y));
+                d.y1 = d.y0 + (d.y1 - d.y0);
+                d3.select(this).attr("transform", `translate(${d.x0},${d.y0})`);
+                sankey.update(sankeyData);
+                svg.selectAll(".link").attr("d", d3.sankeyLinkHorizontal());
+            }
+        }).catch(function(error) {
+            console.error("Ошибка загрузки данных :", error);
+        });
     });
 </script>
 {{end}}
